@@ -9,3 +9,6 @@ router.put('/profile', protect, updateProfile);
 router.delete('/profile', protect, deleteProfile); 
 
 export default router;
+
+
+
