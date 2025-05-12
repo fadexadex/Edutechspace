@@ -25,7 +25,7 @@ export const login = async (req, res, next) => {
 
     const { data: userData, error: dbError } = await supabase
       .from("users")
-      .select("password")
+      .select("id, password")
       .eq("email", email)
       .single();
 
