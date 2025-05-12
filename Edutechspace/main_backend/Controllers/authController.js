@@ -117,34 +117,33 @@ export const logout = async (req, res, next) => {
   }
 };
 
-export const generateToken = async (req, res) => {
+export const generateToken = async (req, res, next) => {
   try {
     const { userId } = req.body;
+
     if (!userId) {
-      return res.status(400).json({ error: "User ID is required" });
+      throw new AppError("User ID is required", 400);
     }
 
-    // Verify user exists in the users table
-    const { data: userData, error: dbError } = await supabase
+    const { data: user, error } = await supabase
       .from("users")
-      .select(
-        "id, name, email, picture, ongoingcourses, completedcourses, password, phone"
-      )
+      .select("id, name, email, picture, ongoingcourses, completedcourses, phone")
       .eq("id", userId)
       .single();
-
-    if (dbError || !userData) {
-      return res.status(404).json({ error: "User not found" });
+    console.log('generateToken: Supabase query result:', { data: user, error });
+    if (error || !user) {
+      throw new AppError("User not found", 404);
     }
 
     const token = jwt.sign({ userId }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
-    console.log("Genereted Token:", token);
-    console.log("JWT secret:", process.env.JWT_SECRET);
-    res.status(200).json({ ...userData, token });
+
+    res.status(200).json({
+      ...user,
+      token,
+    });
   } catch (err) {
-    console.error("generateToken: Server error:", err.message);
-    res.status(500).json({ error: "Server error during token generation" });
+    next(err);
   }
 };

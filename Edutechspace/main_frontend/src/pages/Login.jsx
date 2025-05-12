@@ -1,11 +1,14 @@
 import { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthProvider';
-
+import { AiOutlineEye, AiOutlineEyeInvisible } from 'react-icons/ai';
+import ForgotPasswordMdl from '../component/dialog/ForgotPasswordMdl';
 const Login = () => {
   const { login, googleLogin, loading } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+    const [isForgottenPasswordOpen, setIsForgottenPasswordOpen] = useState(false);
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
@@ -14,6 +17,18 @@ const Login = () => {
     } catch (err) {
       // Errors are handled in AuthProvider with toast
     }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const openForgottenPassword = () => {
+    setIsForgottenPasswordOpen(true);
+  };
+
+  const closeForgottenPassword = () => {
+    setIsForgottenPasswordOpen(false);
   };
 
   return (
@@ -36,14 +51,15 @@ const Login = () => {
           </button>
           <button
             disabled={true}
-            className="w-full flex items-center justify-center border border-neutral-300 bg-white text-neutral-700 _
-
-py-2 px-4 rounded-lg opacity-50 cursor-not-allowed"
+            className="w-full flex items-center justify-center border border-neutral-300 bg-white text-neutral-700 py-2 px-4 rounded-lg opacity-50 cursor-not-allowed"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+              <path
+                fill="currentColor"
+                d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.66-.22.66-.49v-1.73c-2.78.61-3.37-1.34-3.37-1.34-.46-1.16-1.12-1.47-1.12-1.47-.91-.62.07-.61.07-.61 1.01.07 1.54 1.04 1.54 1.04.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.564 9.564 0 0112 6.8c.85.004 1.71.11 2.52.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.56.83.56 1.67v2.47c0 .27.16.58.67.49A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"
+              />
             </svg>
-            Continue with Facebook
+            Continue with Github
           </button>
           <button
             disabled={true}
@@ -81,12 +97,12 @@ py-2 px-4 rounded-lg opacity-50 cursor-not-allowed"
               required
             />
           </div>
-          <div>
+          <div className="relative">
             <label htmlFor="password" className="block text-neutral-700 font-bold">
               Password
             </label>
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -94,6 +110,14 @@ py-2 px-4 rounded-lg opacity-50 cursor-not-allowed"
               placeholder="Enter your password"
               required
             />
+            <button
+              type="button"
+              onClick={togglePasswordVisibility}
+              className="absolute right-3 top-10 text-neutral-600"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <AiOutlineEyeInvisible size={20} /> : <AiOutlineEye size={20} />}
+            </button>
           </div>
           <button
             type="submit"
@@ -111,11 +135,20 @@ py-2 px-4 rounded-lg opacity-50 cursor-not-allowed"
             </Link>
           </p>
           <p className="text-neutral-600 mt-2">
-            <Link to="/forgot-password" className="text-neutral-900 font-semibold">
+            <button
+              onClick={openForgottenPassword}
+              className="text-neutral-900 font-semibold hover:underline"
+            >
               Forgot my password
-            </Link>
+            </button>
           </p>
         </div>
+        <ForgotPasswordMdl
+          isOpen={isForgottenPasswordOpen}
+          onClose={closeForgottenPassword}
+          email={email}
+          setEmail={setEmail}
+        />
       </div>
     </section>
   );

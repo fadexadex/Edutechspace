@@ -4,6 +4,8 @@ import { AuthContext } from "../context/AuthProvider";
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { Fragment } from 'react';
 import { toast } from 'react-toastify';
+import { supabase } from "../../db/Superbase-client";
+import Cookies from 'js-cookie';
 
 const UserProfile = () => {
   const { user, loading, fetchProfile, deleteAccount } = useContext(AuthContext);
@@ -13,34 +15,41 @@ const UserProfile = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   useEffect(() => {
-    console.log('Profile.jsx: useEffect [user, fetchProfile] - Starting');
-    const loadProfile = async () => {
-      console.log('Profile.jsx: loadProfile - Starting');
+    const checkProfile = async () => {
       if (!user && !loading) {
-        console.log('Profile.jsx: loadProfile - User is null and not loading, fetching profile...');
-        try {
-          await fetchProfile();
-          console.log('Profile.jsx: loadProfile - fetchProfile completed');
-        } catch (err) {
-          console.error('Profile.jsx: loadProfile - Error fetching profile:', err);
-          toast.error('Failed to load profile.');
+        // Check if there's a Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && !Cookies.get('token')) {
+          console.log('Profile.jsx: Supabase session exists but no token, authentication failed');
+          toast.error('Authentication failed. Please log in again.');
+          navigate('/login');
+          return;
         }
-      } else {
-        console.log('Profile.jsx: loadProfile - User already exists or loading:', user);
+
+        // Fetch profile only if user is null and not loading
+        const loadProfile = async () => {
+          try {
+            await fetchProfile();
+          } catch (err) {
+            console.error('Profile.jsx: loadProfile - Error fetching profile:', err);
+          }
+        };
+        loadProfile();
       }
-      console.log('Profile.jsx: loadProfile - Finished');
     };
-    loadProfile();
-    console.log('Profile.jsx: useEffect [user, fetchProfile] - Finished');
-  }, [user, fetchProfile, loading]);
+
+    checkProfile();
+  }, [user, loading, fetchProfile, navigate]);
 
   useEffect(() => {
     console.log('Profile.jsx: useEffect [user] (name parsing) - Starting');
     if (user && user.name) {
-      const nameParts = user.name.split(" ");
-      setFirstName(nameParts[0] || "");
-      setLastName(nameParts.length > 1 ? nameParts[nameParts.length - 1] : "");
-      console.log('Profile.jsx: useEffect [user] (name parsing) - Name set:', firstName, lastName);
+      const nameParts = user.name.trim().split(" ");
+      const newFirstName = nameParts[0] || "";
+      const newLastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+      setFirstName(newFirstName);
+      setLastName(newLastName);
+      console.log('Profile.jsx: useEffect [user] (name parsing) - Name set:', newFirstName, newLastName);
     } else {
       console.log('Profile.jsx: useEffect [user] (name parsing) - User or user.name is null/undefined, skipping');
       setFirstName("");
@@ -63,7 +72,6 @@ const UserProfile = () => {
       console.log('Profile.jsx: handleDeleteAccount - Account deleted successfully');
     } catch (error) {
       console.error('Profile.jsx: handleDeleteAccount - Error deleting account:', error);
-      toast.error('Failed to delete account.');
     } finally {
       setDeleteModalOpen(false);
       console.log('Profile.jsx: handleDeleteAccount - Modal closed');

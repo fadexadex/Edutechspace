@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import { useNavigate } from 'react-router-dom';
@@ -12,43 +12,49 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const isFetchingProfile = useRef(false);
+  const isSyncingGoogleUser = useRef(false);
 
   useEffect(() => {
     const initializeAuth = async () => {
+      if (isFetchingProfile.current) {
+        console.log('initializeAuth: Already fetching profile, skipping');
+        return;
+      }
+
       setLoading(true);
       console.log('initializeAuth: Starting');
       try {
-        // Check Supabase session for Google-authenticated users
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           console.log('initializeAuth: Supabase session found:', session.user);
-          await syncGoogleUser(session.user);
+          if (!isSyncingGoogleUser.current) {
+            isSyncingGoogleUser.current = true;
+            try {
+              await syncGoogleUser(session.user);
+            } finally {
+              isSyncingGoogleUser.current = false;
+            }
+          }
         } else {
-          // Check for email-authenticated users via token
           const token = Cookies.get('token');
           console.log('initializeAuth: Initial token:', token);
 
           if (token) {
             try {
-              const userData = localStorage.getItem('user');
-              const storedUser = userData ? JSON.parse(userData) : null;
-              if (storedUser) {
-                setUser(storedUser);
-                setIsAuthenticated(true);
-                console.log('initializeAuth: User set from localStorage:', storedUser);
-              } else {
-                console.log('initializeAuth: No user in localStorage, fetching profile...');
-                await fetchProfile();
-                console.log('initializeAuth: fetchProfile completed');
-              }
+              isFetchingProfile.current = true;
+              await fetchProfile(token);
+              console.log('initializeAuth: fetchProfile completed');
             } catch (err) {
-              console.error('initializeAuth: Error parsing localStorage or fetching profile:', err);
+              console.error('initializeAuth: Error fetching profile:', err);
               Cookies.remove('token');
               localStorage.removeItem('user');
               localStorage.removeItem('token');
               toast.error('Session expired. Please log in again.');
               setIsAuthenticated(false);
               setUser(null);
+            } finally {
+              isFetchingProfile.current = false;
             }
           } else {
             console.log('initializeAuth: No token or session found.');
@@ -66,49 +72,167 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  useEffect(() => {
+    const token = Cookies.get('token');
+    if (token && !user && !isFetchingProfile.current) {
+      console.log('Token changed, re-running fetchProfile');
+      const fetchProfileOnTokenChange = async () => {
+        try {
+          isFetchingProfile.current = true;
+          await fetchProfile(token);
+        } catch (err) {
+          console.error('Token change: Error fetching profile:', err);
+          Cookies.remove('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+          toast.error('Session expired. Please log in again.');
+          setIsAuthenticated(false);
+          setUser(null);
+        } finally {
+          isFetchingProfile.current = false;
+        }
+      };
+      fetchProfileOnTokenChange();
+    }
+  }, [Cookies.get('token')]);
+
   const syncGoogleUser = async (supabaseUser) => {
-    try {
-      // Upsert user to handle potential race conditions
-      const { data: userData, error: upsertError } = await supabase
+  console.log('syncGoogleUser: Starting for user:', supabaseUser.email);
+  console.log('syncGoogleUser: auth.uid():', supabaseUser.id);
+  try {
+    // Check if a user exists with the authenticated user's ID
+    const { data: existingUser, error: selectError } = await supabase
+      .from('users')
+      .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
+      .eq('id', supabaseUser.id)
+      .single();
+
+    let userData;
+
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('syncGoogleUser: Error checking existing user:', selectError.message);
+      throw new Error(selectError.message);
+    }
+
+    if (existingUser) {
+      console.log('syncGoogleUser: Existing user found:', existingUser);
+      // Attempt to update the existing user
+      const { data: updatedUser, error: updateError } = await supabase
         .from('users')
-        .upsert(
-          {
-            id: supabaseUser.id,
-            name: supabaseUser.user_metadata.name || supabaseUser.email.split('@')[0],
-            email: supabaseUser.email,
-            picture: supabaseUser.user_metadata.picture || null,
-            phone: supabaseUser.user_metadata.phone || null,
-            ongoingcourses: 0,
-            completedcourses: 0,
-            password: null, // Google users don't have passwords
-          },
-          { onConflict: 'id' }
-        )
-        .select('id, name, email, picture, ongoingcourses, completedcourses, password, phone')
+        .update({
+          name: supabaseUser.user_metadata.name || existingUser.name,
+          picture: supabaseUser.user_metadata.picture || existingUser.picture,
+          phone: supabaseUser.user_metadata.phone || existingUser.phone,
+        })
+        .eq('id', existingUser.id)
+        .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
         .single();
 
-      if (upsertError) {
-        console.error('syncGoogleUser: Database upsert error:', upsertError.message);
-        throw new Error(upsertError.message);
+      if (updateError) {
+        console.error('syncGoogleUser: Error updating existing user:', updateError.message);
+        if (updateError.code === 'PGRST116') {
+          console.log('syncGoogleUser: Update returned no rows, re-checking user');
+          const { data: recheckUser, error: recheckError } = await supabase
+            .from('users')
+            .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
+            .eq('id', existingUser.id)
+            .single();
+
+          if (recheckError || !recheckUser) {
+            console.error('syncGoogleUser: User no longer exists:', recheckError?.message || 'No user found');
+            // Create a new user as fallback
+            const { data: newUser, error: insertError } = await supabase
+              .from('users')
+              .insert({
+                id: supabaseUser.id,
+                name: supabaseUser.user_metadata.name || supabaseUser.email.split('@')[0],
+                email: supabaseUser.email,
+                picture: supabaseUser.user_metadata.picture || null,
+                phone: supabaseUser.user_metadata.phone || null,
+                ongoingcourses: 0,
+                completedcourses: 0,
+                password: null,
+              })
+              .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
+              .single();
+
+            if (insertError) {
+              console.error('syncGoogleUser: Error creating fallback user:', insertError.message);
+              throw new Error(insertError.message);
+            }
+
+            userData = newUser;
+            console.log('syncGoogleUser: Fallback user created:', userData);
+          } else {
+            userData = recheckUser;
+            console.log('syncGoogleUser: Using existing user data after failed update:', userData);
+          }
+        } else {
+          throw new Error(updateError.message);
+        }
+      } else {
+        userData = updatedUser;
+        console.log('syncGoogleUser: Existing user updated:', userData);
+      }
+    } else {
+      // Create a new user
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: supabaseUser.id,
+          name: supabaseUser.user_metadata.name || supabaseUser.email.split('@')[0],
+          email: supabaseUser.email,
+          picture: supabaseUser.user_metadata.picture || null,
+          phone: supabaseUser.user_metadata.phone || null,
+          ongoingcourses: 0,
+          completedcourses: 0,
+          password: null,
+        })
+        .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
+        .single();
+
+      if (insertError) {
+        console.error('syncGoogleUser: Error creating new user:', insertError.message);
+        throw new Error(insertError.message);
       }
 
-      // Generate JWT token via backend
-      const response = await axios.post('http://localhost:8000/api/auth/generate-token', {
-        userId: userData.id,
-      });
-
-      const userInfo = response.data; // Includes id, name, email, picture, ongoingcourses, completedcourses, password, phone, token
-      Cookies.set('token', userInfo.token, { expires: 7 });
-      localStorage.setItem('token', userInfo.token);
-      localStorage.setItem('user', JSON.stringify(userInfo));
-      setUser(userInfo);
-      setIsAuthenticated(true);
-      console.log('syncGoogleUser: User synced and token generated:', userInfo);
-    } catch (err) {
-      console.error('syncGoogleUser: Error:', err.message);
-      throw err;
+      userData = newUser;
+      console.log('syncGoogleUser: New user created:', userData);
     }
-  };
+
+    // Verify user exists before generating token
+    const { data: verifyUser, error: verifyError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userData.id)
+      .single();
+
+    if (verifyError || !verifyUser) {
+      console.error('syncGoogleUser: User not found after update/insert:', verifyError?.message);
+      throw new Error('User not found after update/insert');
+    }
+
+    console.log('syncGoogleUser: User verified, generating token for userId:', userData.id);
+    // Generate JWT token
+    const response = await axios.post('http://localhost:8000/api/auth/generate-token', {
+      userId: userData.id,
+    });
+
+    const userInfo = response.data;
+    Cookies.set('token', userInfo.token, { expires: 7 });
+    localStorage.setItem('token', userInfo.token);
+    localStorage.setItem('user', JSON.stringify(userInfo));
+    setUser(userInfo);
+    setIsAuthenticated(true);
+    console.log('syncGoogleUser: User synced and token generated:', userInfo);
+    toast.success('Logged in with Google successfully!');
+    navigate('/course');
+  } catch (err) {
+    console.error('syncGoogleUser: Error:', err.message);
+    toast.error('Failed to sync Google account.');
+    throw err;
+  }
+};
 
   const login = async (email, password) => {
     setLoading(true);
@@ -118,17 +242,16 @@ export const AuthProvider = ({ children }) => {
         password,
       });
 
-      const userData = response.data;
-      Cookies.set('token', userData.token, { expires: 7 });
-      localStorage.setItem('token', userData.token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
+      const { token } = response.data;
+      Cookies.set('token', token, { expires: 7 });
+      localStorage.setItem('token', token);
+      const userData = await fetchProfile(token);
       setIsAuthenticated(true);
       toast.success('Logged in successfully!');
       navigate('/course');
       return userData;
     } catch (err) {
-      const errorMsg = err.response?.data?.error || 'Failed to log in';
+      const errorMsg = err.response?.data?.message || 'Failed to log in';
       toast.error(errorMsg);
       throw err;
     } finally {
@@ -146,17 +269,16 @@ export const AuthProvider = ({ children }) => {
         password,
       });
 
-      const userData = response.data;
-      Cookies.set('token', userData.token, { expires: 7 });
-      localStorage.setItem('token', userData.token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
+      const { token } = response.data;
+      Cookies.set('token', token, { expires: 7 });
+      localStorage.setItem('token', token);
+      const userData = await fetchProfile(token);
       setIsAuthenticated(true);
       toast.success('Account created successfully!');
       navigate('/course');
       return userData;
     } catch (err) {
-      const errorMsg = err.response?.data?.error || 'Failed to sign up';
+      const errorMsg = err.response?.data?.message || 'Failed to sign up';
       toast.error(errorMsg);
       throw err;
     } finally {
@@ -179,7 +301,6 @@ export const AuthProvider = ({ children }) => {
         toast.error('Failed to log in with Google');
         throw error;
       }
-      // User data is synced in initializeAuth after redirect
     } catch (err) {
       console.error('googleLogin: Error:', err.message);
       toast.error('Failed to log in with Google');
@@ -215,11 +336,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const fetchProfile = async () => {
+  const fetchProfile = async (providedToken) => {
     setLoading(true);
     console.log('fetchProfile: Started');
     try {
-      const token = Cookies.get('token');
+      const token = providedToken || Cookies.get('token');
       console.log('fetchProfile: Token:', token);
 
       if (!token) {
@@ -244,8 +365,7 @@ export const AuthProvider = ({ children }) => {
       return userData;
     } catch (err) {
       console.error('fetchProfile: Error:', err);
-      console.error('fetchProfile: Error Details:', err.response || err);
-      const errorMsg = err.response?.data?.error || 'Failed to load profile';
+      const errorMsg = err.response?.data?.error || 'Failed to fetch profile';
       toast.error(errorMsg);
       setIsAuthenticated(false);
       Cookies.remove('token');
@@ -287,7 +407,6 @@ export const AuthProvider = ({ children }) => {
       navigate('/');
     } catch (err) {
       console.error('deleteAccount: Error:', err);
-      console.error('deleteAccount: Error Details:', err.response || err);
       const errorMsg = err.response?.data?.error || 'Failed to delete account';
       toast.error(errorMsg);
       throw err;
