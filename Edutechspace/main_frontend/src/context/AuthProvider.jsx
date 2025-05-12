@@ -284,7 +284,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('token');
       setUser(null);
       setIsAuthenticated(false);
-      toast.success('Account deleted successfully.');
       navigate('/');
     } catch (err) {
       console.error('deleteAccount: Error:', err);

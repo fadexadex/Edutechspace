@@ -1,7 +1,6 @@
 import { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthProvider';
-import { toast } from 'react-toastify';
 
 const Signup = () => {
   const { signup, googleLogin, loading } = useContext(AuthContext);
@@ -23,7 +22,6 @@ const Signup = () => {
     e.preventDefault();
     try {
       await signup(formData.name, formData.email, formData.password, formData.phone);
-      toast.success('Account created successfully!');
     } catch (err) {
       // Errors are handled in AuthProvider with toast
     }

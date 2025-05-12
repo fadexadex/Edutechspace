@@ -1,7 +1,6 @@
 import { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthProvider';
-import { toast } from 'react-toastify';
 
 const Login = () => {
   const { login, googleLogin, loading } = useContext(AuthContext);
@@ -12,7 +11,6 @@ const Login = () => {
     e.preventDefault();
     try {
       await login(email, password);
-      toast.success('Logged in successfully!');
     } catch (err) {
       // Errors are handled in AuthProvider with toast
     }
