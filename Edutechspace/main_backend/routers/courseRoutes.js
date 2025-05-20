@@ -2,6 +2,7 @@ import express from "express";
 import {
   enrollUserInCourse,
   getCourses,
+  getRichCourses,
   getUserEnrolledCourses,
 } from "../Controllers/courseController.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -9,7 +10,9 @@ import { protect } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 // router.get('/progress/:userId', protect, getCourseProgress);
+router.get("/list-rich", getRichCourses);
 router.get("/list", getCourses);
+
 router.post("/enroll", protect, enrollUserInCourse);
 router.get("/enrolled", protect, getUserEnrolledCourses)
 // router.post('/upload', authMiddleware, uploadResource);
