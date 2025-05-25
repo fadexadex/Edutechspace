@@ -155,7 +155,7 @@ const CourseDatabase = () => {
         return;
       }
       const { error } = await supabase
-        .from('enrollments')
+        .from('courses_enrolled')
         .insert({ user_id: user.id, course_id: courseId });
       if (error) {
         throw error;
@@ -176,7 +176,7 @@ const CourseDatabase = () => {
         <p className="text-xl text-neutral-600 text-center mt-4">
           Discover a list of carefully picked courses with certifications to get you started on your tech journey!
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-10 relative z-0">
           {courses.map((course, index) => (
             <motion.div
               key={course.id}
@@ -187,13 +187,19 @@ const CourseDatabase = () => {
             >
               <div
                 className="relative bg-white rounded-lg shadow-lg overflow-hidden"
-                onMouseEnter={() => setHoveredCourse(course.id)}
-                onMouseLeave={() => setHoveredCourse(null)}
+                onMouseEnter={() => {
+                  console.log('Hovering over course:', course.id);
+                  setHoveredCourse(course.id);
+                }}
+                onMouseLeave={() => {
+                  console.log('Leaving course:', course.id);
+                  setHoveredCourse(null);
+                }}
               >
                 <img
                   src={course.image}
                   alt={course.title}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-48 object-cover pointer-events-none"
                 />
                 <div className="p-6">
                   <h3 className="text-2xl font-semibold text-neutral-900">{course.title}</h3>
@@ -226,7 +232,7 @@ const CourseDatabase = () => {
                   leaveFrom="opacity-100 translate-x-0"
                   leaveTo="opacity-0 translate-x-2"
                 >
-                  <div className="absolute top-0 left-full ml-4 w-80 bg-white rounded-lg shadow-lg p-6 z-10 md:top-0 md:left-full md:ml-4 sm:top-full sm:left-0 sm:mt-4 sm:ml-0">
+                  <div className="absolute top-0 right-0 mr-4 w-80 bg-white rounded-lg shadow-lg p-6 z-20 md:top-0 md:right-0 md:mr-4 sm:top-full sm:left-0 sm:right-auto sm:mt-4 sm:mr-0">
                     <h4 className="text-lg font-semibold text-neutral-900">{course.title}</h4>
                     <h5 className="text-md font-medium text-neutral-700 mt-3">What You'll Learn</h5>
                     <ul className="mt-2 space-y-2 text-neutral-600">
