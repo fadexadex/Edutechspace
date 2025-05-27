@@ -1,21 +1,20 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../../Auth/useAuth';
-
-const  ProtectedRoute = ({ requireAdmin = false }) => {
-  const { user, isAdmin } = useAuth();
-  
+import React, { useContext } from "react";
+import { AuthContext } from "../context/AuthProvider";
+const ProtectedRoute = ({ requireAdmin = false }) => {
+  const { user, isAdmin } = useContext(AuthContext);
   // If no user is found, redirect to login page
   if (!user) {
     return <Navigate to="/login" replace />;
-    // Alternative: Show login UI directly instead of redirecting
-    // return <LoginComponent />;
   }
-  
-  // If admin is required but user is not admin
+
+  // If admin is required but user is not admin, redirect to home page
   if (requireAdmin && !isAdmin()) {
     return <Navigate to="/" replace />;
   }
-  
+
+  // If all conditions are met, render the child routes
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

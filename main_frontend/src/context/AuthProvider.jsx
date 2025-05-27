@@ -12,18 +12,11 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const isFetchingProfile = useRef(false);
   const isSyncingGoogleUser = useRef(false);
 
   useEffect(() => {
     const initializeAuth = async () => {
-      if (isFetchingProfile.current) {
-        console.log('initializeAuth: Already fetching profile, skipping');
-        return;
-      }
-
       setLoading(true);
-      console.log('initializeAuth: Starting');
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
@@ -37,202 +30,123 @@ export const AuthProvider = ({ children }) => {
             }
           }
         } else {
-          const token = Cookies.get('token');
-          console.log('initializeAuth: Initial token:', token);
-
-          if (token) {
-            try {
-              isFetchingProfile.current = true;
-              await fetchProfile(token);
-              console.log('initializeAuth: fetchProfile completed');
-            } catch (err) {
-              console.error('initializeAuth: Error fetching profile:', err);
-              Cookies.remove('token');
-              localStorage.removeItem('user');
-              localStorage.removeItem('token');
-              toast.error('Session expired. Please log in again.');
-              setIsAuthenticated(false);
-              setUser(null);
-            } finally {
-              isFetchingProfile.current = false;
-            }
-          } else {
-            console.log('initializeAuth: No token or session found.');
-          }
+          console.log('initializeAuth: No session found.');
         }
       } catch (err) {
         console.error('initializeAuth: Unexpected error:', err);
         toast.error('An error occurred during authentication.');
       } finally {
         setLoading(false);
-        console.log('initializeAuth: Finished');
       }
     };
 
     initializeAuth();
-  }, []);
 
-  useEffect(() => {
-    const token = Cookies.get('token');
-    if (token && !user && !isFetchingProfile.current) {
-      console.log('Token changed, re-running fetchProfile');
-      const fetchProfileOnTokenChange = async () => {
-        try {
-          isFetchingProfile.current = true;
-          await fetchProfile(token);
-        } catch (err) {
-          console.error('Token change: Error fetching profile:', err);
-          Cookies.remove('token');
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
-          toast.error('Session expired. Please log in again.');
-          setIsAuthenticated(false);
-          setUser(null);
-        } finally {
-          isFetchingProfile.current = false;
-        }
-      };
-      fetchProfileOnTokenChange();
-    }
-  }, [Cookies.get('token')]);
-
-  const syncGoogleUser = async (supabaseUser) => {
-  console.log('syncGoogleUser: Starting for user:', supabaseUser.email);
-  console.log('syncGoogleUser: auth.uid():', supabaseUser.id);
-  try {
-    // Check if a user exists with the authenticated user's ID
-    const { data: existingUser, error: selectError } = await supabase
-      .from('users')
-      .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
-      .eq('id', supabaseUser.id)
-      .single();
-
-    let userData;
-
-    if (selectError && selectError.code !== 'PGRST116') {
-      console.error('syncGoogleUser: Error checking existing user:', selectError.message);
-      throw new Error(selectError.message);
-    }
-
-    if (existingUser) {
-      console.log('syncGoogleUser: Existing user found:', existingUser);
-      // Attempt to update the existing user
-      const { data: updatedUser, error: updateError } = await supabase
-        .from('users')
-        .update({
-          name: supabaseUser.user_metadata.name || existingUser.name,
-          picture: supabaseUser.user_metadata.picture || existingUser.picture,
-          phone: supabaseUser.user_metadata.phone || existingUser.phone,
-        })
-        .eq('id', existingUser.id)
-        .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
-        .single();
-
-      if (updateError) {
-        console.error('syncGoogleUser: Error updating existing user:', updateError.message);
-        if (updateError.code === 'PGRST116') {
-          console.log('syncGoogleUser: Update returned no rows, re-checking user');
-          const { data: recheckUser, error: recheckError } = await supabase
-            .from('users')
-            .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
-            .eq('id', existingUser.id)
-            .single();
-
-          if (recheckError || !recheckUser) {
-            console.error('syncGoogleUser: User no longer exists:', recheckError?.message || 'No user found');
-            // Create a new user as fallback
-            const { data: newUser, error: insertError } = await supabase
-              .from('users')
-              .insert({
-                id: supabaseUser.id,
-                name: supabaseUser.user_metadata.name || supabaseUser.email.split('@')[0],
-                email: supabaseUser.email,
-                picture: supabaseUser.user_metadata.picture || null,
-                phone: supabaseUser.user_metadata.phone || null,
-                ongoingcourses: 0,
-                completedcourses: 0,
-                password: null,
-              })
-              .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
-              .single();
-
-            if (insertError) {
-              console.error('syncGoogleUser: Error creating fallback user:', insertError.message);
-              throw new Error(insertError.message);
-            }
-
-            userData = newUser;
-            console.log('syncGoogleUser: Fallback user created:', userData);
-          } else {
-            userData = recheckUser;
-            console.log('syncGoogleUser: Using existing user data after failed update:', userData);
+    // Listen for Supabase auth state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session);
+      if (event === 'SIGNED_IN' && session) {
+        if (!isSyncingGoogleUser.current) {
+          isSyncingGoogleUser.current = true;
+          try {
+            await syncGoogleUser(session.user);
+          } finally {
+            isSyncingGoogleUser.current = false;
           }
-        } else {
-          throw new Error(updateError.message);
         }
-      } else {
-        userData = updatedUser;
-        console.log('syncGoogleUser: Existing user updated:', userData);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setIsAuthenticated(false);
+        Cookies.remove('token');
+        localStorage.removeItem('user');
+        toast.info('You have been logged out.');
+        navigate('/login');
       }
-    } else {
-      // Create a new user
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          id: supabaseUser.id,
-          name: supabaseUser.user_metadata.name || supabaseUser.email.split('@')[0],
-          email: supabaseUser.email,
-          picture: supabaseUser.user_metadata.picture || null,
-          phone: supabaseUser.user_metadata.phone || null,
-          ongoingcourses: 0,
-          completedcourses: 0,
-          password: null,
-        })
-        .select('id, name, email, picture, ongoingcourses, completedcourses, phone')
-        .single();
-
-      if (insertError) {
-        console.error('syncGoogleUser: Error creating new user:', insertError.message);
-        throw new Error(insertError.message);
-      }
-
-      userData = newUser;
-      console.log('syncGoogleUser: New user created:', userData);
-    }
-
-    // Verify user exists before generating token
-    const { data: verifyUser, error: verifyError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', userData.id)
-      .single();
-
-    if (verifyError || !verifyUser) {
-      console.error('syncGoogleUser: User not found after update/insert:', verifyError?.message);
-      throw new Error('User not found after update/insert');
-    }
-
-    console.log('syncGoogleUser: User verified, generating token for userId:', userData.id);
-    // Generate JWT token
-    const response = await axios.post('http://localhost:8000/api/auth/generate-token', {
-      userId: userData.id,
     });
 
-    const userInfo = response.data;
-    Cookies.set('token', userInfo.token, { expires: 7 });
-    localStorage.setItem('token', userInfo.token);
-    localStorage.setItem('user', JSON.stringify(userInfo));
-    setUser(userInfo);
-    setIsAuthenticated(true);
-    console.log('syncGoogleUser: User synced and token generated:', userInfo);
-    toast.success('Logged in with Google successfully!');
-    navigate('/course');
-  } catch (err) {
-    console.error('syncGoogleUser: Error:', err.message);
-    toast.error('Failed to sync Google account.');
-    throw err;
-  }
-};
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [navigate]);
+
+  const syncGoogleUser = async (supabaseUser) => {
+    console.log('syncGoogleUser: Starting for user:', supabaseUser.email);
+    try {
+      // Check if a user exists with the authenticated user's ID
+      const { data: existingUser, error: selectError } = await supabase
+        .from('users')
+        .select('id, name, email, picture, ongoingcourses, completedcourses, phone, role')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      let userData;
+
+      if (selectError && selectError.code !== 'PGRST116') {
+        console.error('syncGoogleUser: Error checking existing user:', selectError.message);
+        throw new Error(selectError.message);
+      }
+
+      if (existingUser) {
+        console.log('syncGoogleUser: Existing user found:', existingUser);
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({
+            name: supabaseUser.user_metadata.name || existingUser.name,
+            picture: supabaseUser.user_metadata.picture || existingUser.picture,
+            phone: supabaseUser.user_metadata.phone || existingUser.phone,
+          })
+          .eq('id', existingUser.id)
+          .select('id, name, email, picture, ongoingcourses, completedcourses, phone, role')
+          .single();
+
+        if (updateError) {
+          console.error('syncGoogleUser: Error updating existing user:', updateError.message);
+          throw new Error(updateError.message);
+        }
+        userData = updatedUser;
+        console.log('syncGoogleUser: Existing user updated:', userData);
+      } else {
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: supabaseUser.id,
+            name: supabaseUser.user_metadata.name || supabaseUser.email.split('@')[0],
+            email: supabaseUser.email,
+            picture: supabaseUser.user_metadata.picture || null,
+            phone: supabaseUser.user_metadata.phone || null,
+            ongoingcourses: 0,
+            completedcourses: 0,
+            role: 'user', // Default role
+          })
+          .select('id, name, email, picture, ongoingcourses, completedcourses, phone, role')
+          .single();
+
+        if (insertError) {
+          console.error('syncGoogleUser: Error creating new user:', insertError.message);
+          throw new Error(insertError.message);
+        }
+        userData = newUser;
+        console.log('syncGoogleUser: New user created:', userData);
+      }
+
+      // Generate JWT token using backend API
+      const response = await axios.post('http://localhost:8000/api/auth/generate-token', {
+        userId: userData.id,
+      });
+
+      const userInfo = { ...userData, token: response.data.token };
+      Cookies.set('token', userInfo.token, { expires: 7 });
+      localStorage.setItem('user', JSON.stringify(userInfo));
+      setUser(userInfo);
+      setIsAuthenticated(true);
+      toast.success('Logged in with Google successfully!');
+      navigate('/course');
+    } catch (err) {
+      console.error('syncGoogleUser: Error:', err.message);
+      toast.error('Failed to sync Google account.');
+      throw err;
+    }
+  };
 
   const login = async (email, password) => {
     setLoading(true);
@@ -244,7 +158,6 @@ export const AuthProvider = ({ children }) => {
 
       const { token } = response.data;
       Cookies.set('token', token, { expires: 7 });
-      localStorage.setItem('token', token);
       const userData = await fetchProfile(token);
       setIsAuthenticated(true);
       toast.success('Logged in successfully!');
@@ -271,7 +184,6 @@ export const AuthProvider = ({ children }) => {
 
       const { token } = response.data;
       Cookies.set('token', token, { expires: 7 });
-      localStorage.setItem('token', token);
       const userData = await fetchProfile(token);
       setIsAuthenticated(true);
       toast.success('Account created successfully!');
@@ -313,11 +225,14 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     setLoading(true);
     try {
-      await axios.post('http://localhost:8000/api/auth/logout');
+      await axios.post('http://localhost:8000/api/auth/logout', {}, {
+        headers: {
+          Authorization: `Bearer ${Cookies.get('token')}`,
+        },
+      });
       await supabase.auth.signOut();
       Cookies.remove('token');
       localStorage.removeItem('user');
-      localStorage.removeItem('token');
       setUser(null);
       setIsAuthenticated(false);
       toast.success('Logged out successfully!');
@@ -326,7 +241,6 @@ export const AuthProvider = ({ children }) => {
       console.error('logout: Error:', err);
       Cookies.remove('token');
       localStorage.removeItem('user');
-      localStorage.removeItem('token');
       setUser(null);
       setIsAuthenticated(false);
       toast.info('Logged out successfully (client-side).');
@@ -338,29 +252,22 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async (providedToken) => {
     setLoading(true);
-    console.log('fetchProfile: Started');
     try {
       const token = providedToken || Cookies.get('token');
-      console.log('fetchProfile: Token:', token);
-
       if (!token) {
         throw new Error('No token found');
       }
 
-      console.log('fetchProfile: Making API request...');
       const response = await axios.get('http://localhost:8000/api/user/profile', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      console.log('fetchProfile: API Response:', response.data);
       const userData = response.data;
       setUser(userData);
       setIsAuthenticated(true);
       localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('token', token);
-      console.log('fetchProfile: User set and stored in localStorage:', userData);
       toast.success('Profile loaded successfully!');
       return userData;
     } catch (err) {
@@ -370,41 +277,34 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       Cookies.remove('token');
       localStorage.removeItem('user');
-      localStorage.removeItem('token');
       setUser(null);
       throw err;
     } finally {
       setLoading(false);
-      console.log('fetchProfile: Finished');
     }
   };
 
   const deleteAccount = async () => {
     setLoading(true);
-    console.log('deleteAccount: Started');
     try {
       const token = Cookies.get('token');
-      console.log('deleteAccount: Token:', token);
-
       if (!token) {
         throw new Error('No token found');
       }
 
-      console.log('deleteAccount: Making API request...');
-      const response = await axios.delete('http://localhost:8000/api/user/profile', {
+      await axios.delete('http://localhost:8000/api/user/profile', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      console.log('deleteAccount: API Response:', response.data);
       await supabase.auth.signOut();
       Cookies.remove('token');
       localStorage.removeItem('user');
-      localStorage.removeItem('token');
       setUser(null);
       setIsAuthenticated(false);
       navigate('/');
+      toast.success('Account deleted successfully!');
     } catch (err) {
       console.error('deleteAccount: Error:', err);
       const errorMsg = err.response?.data?.error || 'Failed to delete account';
@@ -412,8 +312,11 @@ export const AuthProvider = ({ children }) => {
       throw err;
     } finally {
       setLoading(false);
-      console.log('deleteAccount: Finished');
     }
+  };
+
+  const isAdmin = () => {
+    return user?.role === 'admin';
   };
 
   const contextValue = {
@@ -426,6 +329,7 @@ export const AuthProvider = ({ children }) => {
     googleLogin,
     fetchProfile,
     deleteAccount,
+    isAdmin,
   };
 
   return (

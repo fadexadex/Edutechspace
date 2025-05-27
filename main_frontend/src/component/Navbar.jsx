@@ -3,8 +3,7 @@ import { NavLink } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import logoiii from '../assets/images/logoii.png';
 import LogoutDialog from './dialog/LogoutDialog';
-import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
-
+import { Bars3Icon, XMarkIcon, BellIcon } from "@heroicons/react/24/outline";
 
 const Navbar = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -47,23 +46,43 @@ const Navbar = () => {
               <NavLink className="navlinks" to="/certification-exam">RTS Certification Exams</NavLink>
               <NavLink className="navlinks" to="/about-us">About us</NavLink>
             </div>
-            {isLoggedIn && (
-              <div className="flex items-center sm:ml-[22rem] space-x-4">
-                <NavLink className=" cursor-pointer" to="/profile">
-                  <img
-                    src={user.picture || "https://i.pravatar.cc/300"}
-                    alt={user.name}
-                    className="w-14 h-14 object-cover rounded-full border-4 border-blue-950"
-                  />
-                </NavLink>
-                <button
-                  className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all hidden md:block md:ml-auto"
-                  onClick={() => setShowLogoutModal(true)}
-                >
-                  Logout
-                </button>
-              </div>
-            )}
+            <div className="flex items-center space-x-4">
+              {!isLoggedIn ? (
+                <>
+                  <NavLink
+                    to="/login"
+                    className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all"
+                  >
+                    Login
+                  </NavLink>
+                  <NavLink
+                    to="/signup"
+                    className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all"
+                  >
+                    Signup
+                  </NavLink>
+                </>
+              ) : (
+                <>
+                  <NavLink to="/notifications" className="cursor-pointer">
+                    <BellIcon className="w-8 h-8 text-blue-950 hover:text-slate-900 transition" />
+                  </NavLink>
+                  <NavLink to="/profile" className="cursor-pointer">
+                    <img
+                      src={user.picture || "https://i.pravatar.cc/300"}
+                      alt={user.name}
+                      className="w-14 h-14 object-cover rounded-full border-4 border-blue-950"
+                    />
+                  </NavLink>
+                  <button
+                    className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all hidden md:block"
+                    onClick={() => setShowLogoutModal(true)}
+                  >
+                    Logout
+                  </button>
+                </>
+              )}
+            </div>
             <button className="xl:hidden" onClick={() => setMobileNavOpen(!mobileNavOpen)}>
               <Bars3Icon className="w-8 h-8 text-slate-900" />
             </button>
@@ -102,15 +121,24 @@ const Navbar = () => {
                   Certification Exams
                 </NavLink>
                 {isLoggedIn && (
-                  <button
-                    className="max-w-max navlinks text-left"
-                    onClick={() => {
-                      setMobileNavOpen(false);
-                      setShowLogoutModal(true);
-                    }}
-                  >
-                    Logout
-                  </button>
+                  <>
+                    <NavLink
+                      className="max-w-max navlinks"
+                      to="/notifications"
+                      onClick={() => setMobileNavOpen(false)}
+                    >
+                      Notifications
+                    </NavLink>
+                    <button
+                      className="max-w-max navlinks text-left"
+                      onClick={() => {
+                        setMobileNavOpen(false);
+                        setShowLogoutModal(true);
+                      }}
+                    >
+                      Logout
+                    </button>
+                  </>
                 )}
               </div>
               <div className="flex flex-col items-center gap-2">
