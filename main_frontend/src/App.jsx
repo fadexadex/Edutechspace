@@ -49,16 +49,16 @@ const App = () => {
         <Route index element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/coursedatabase" element={<CourseDatabase />} />
+        <Route path="/course/frontendcourse" element={<FrontendDevStack />} />
+        <Route path="/course/backendcourse" element={<BackendDevStack />} />
 
         {/* Protected Routes (require authentication) */}
         <Route element={<ProtectedRoute />}>
           <Route path="/course" element={<Course />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/dashboard" element={<UserDashboard />} />
-          <Route path="/coursedatabase" element={<CourseDatabase />} />
-          <Route path="/course/frontendcourse" element={<FrontendDevStack />} />
           <Route path="/course/cybersecuritycourse" element={<CyberSecurityStack />} />
-          <Route path="/course/backendcourse" element={<BackendDevStack />} />
           <Route path="/course/datasciencecourse" element={<DataScienceStack />} />
           <Route path="/course/mlcourse" element={<MLStack />} />
           <Route path="/course/uiuxcourse" element={<UiUxStack />} />

@@ -130,7 +130,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       // Generate JWT token using backend API
-      const response = await axios.post('http://localhost:8000/api/auth/generate-token', {
+      const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/generate-token`, {
         userId: userData.id,
       });
 
@@ -151,7 +151,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:8000/api/auth/login', {
+      const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/login`, {
         email,
         password,
       });
@@ -175,7 +175,7 @@ export const AuthProvider = ({ children }) => {
   const signup = async (name, email, password, phone = '') => {
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:8000/api/auth/signup', {
+      const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/signup`, {
         name,
         email,
         phone,
@@ -225,7 +225,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     setLoading(true);
     try {
-      await axios.post('http://localhost:8000/api/auth/logout', {}, {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/logout`, {}, {
         headers: {
           Authorization: `Bearer ${Cookies.get('token')}`,
         },
@@ -258,7 +258,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No token found');
       }
 
-      const response = await axios.get('http://localhost:8000/api/user/profile', {
+      const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/user/profile`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -292,7 +292,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No token found');
       }
 
-      await axios.delete('http://localhost:8000/api/user/profile', {
+      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/user/profile`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
