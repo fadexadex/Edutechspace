@@ -37,7 +37,7 @@ const Signup = () => {
     <section className="flex flex-col items-center justify-center min-h-screen bg-neutral-100 p-6">
       <div className="bg-white shadow-lg rounded-lg p-8 max-w-md w-full">
         <h2 className="text-2xl font-bold text-neutral-900 mb-4 text-center">Create an Account</h2>
-        <div className="mb-4 space-y-2">
+        <div className="mb-4">
           <button
             onClick={() => googleLogin()}
             disabled={loading}
@@ -50,30 +50,6 @@ const Signup = () => {
               />
             </svg>
             Sign up with Google
-          </button>
-          <button
-            disabled={true}
-            className="w-full flex items-center justify-center border border-neutral-300 bg-white text-neutral-700 py-2 px-4 rounded-lg opacity-50 cursor-not-allowed"
-          >
-            <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-              <path
-                fill="currentColor"
-                d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.66-.22.66-.49v-1.73c-2.78.61-3.37-1.34-3.37-1.34-.46-1.16-1.12-1.47-1.12-1.47-.91-.62.07-.61.07-.61 1.01.07 1.54 1.04 1.54 1.04.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.564 9.564 0 0112 6.8c.85.004 1.71.11 2.52.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.56.83.56 1.67v2.47c0 .27.16.58.67.49A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"
-              />
-            </svg>
-            Sign up with Github
-          </button>
-          <button
-            disabled={true}
-            className="w-full flex items-center justify-center border border-neutral-300 bg-white text-neutral-700 py-2 px-4 rounded-lg opacity-50 cursor-not-allowed"
-          >
-            <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-              <path
-                fill="currentColor"
-                d="M17.05 20.4c-1.3.7-2.8.5-4-.4-1.2-.9-2.1-2.3-3.3-2.3-1.2 0-2.2 1.4-3.3 2.3-1.2.9-2.6 1.1-4 .4C1.2 19.7.6 18 1.2 16.1c.5-1.7 1.5-3.3 2.5-4.7C4.7 9.9 6 8.8 7.8 8.8c1.2 0 2 1.2 3.3 1.2 1.3 0 2-1.2 3.3-1.2 1.7 0 3 1 4 2.5.3.5.5 1 .7 1.5-.7.2-2.7 1-3.2 3.2-.3 1.4.1 2.7.8 3.7.4.6.9 1.2 1.5 1.7zm-1.2-17c-.7.9-1.8 1.4-2.8 1.4-.2 0-.4 0-.6-.1-.9-.3-1.8-1-2.5-1.7C9.2 2.3 8.8 1.3 8.8 0c0-.2 0-.4.1-.6.9.1 2 .6 2.8 1.4.7.7 1.2 1.8 1.2 2.8 0 .2 0 .4-.1.6z"
-              />
-            </svg>
-            Sign up with Apple
           </button>
         </div>
         <div className="relative mb-4">

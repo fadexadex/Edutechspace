@@ -145,7 +145,6 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       setIsAuthenticated(true);
       setLoading(false);
-      toast.success('Logged in successfully!');
       
     } catch (err) {
       console.error('syncUser: Error:', err.message);
@@ -194,7 +193,7 @@ export const AuthProvider = ({ children }) => {
         },
       });
 
-      if (error) {
+      if (error) {  
         throw error;
       }
 

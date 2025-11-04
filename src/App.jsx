@@ -9,6 +9,7 @@ import Course from './pages/Course';
 import CourseDatabase from './pages/courseDatabase';
 import Contact from './pages/contact';
 import Profile from './pages/Profile';
+import AboutUs from './pages/AboutUs';
 import NotFound from './component/NotFoundPage';
 import CertificateExam from './pages/CertificationExam';
 import ExamPage from './ExamPages/ExamPage';
@@ -49,6 +50,7 @@ const App = () => {
         <Route index element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/about-us" element={<AboutUs />} />
         <Route path="/coursedatabase" element={<CourseDatabase />} />
         <Route path="/course/frontendcourse" element={<FrontendDevStack />} />
         <Route path="/course/backendcourse" element={<BackendDevStack />} />

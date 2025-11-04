@@ -1,36 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
-import Cookies from 'js-cookie';
-import logoiii from '../assets/images/logoii.png';
-import LogoutDialog from './dialog/LogoutDialog';
+import React, { useState, useContext, useEffect } from "react";
+import { NavLink } from "react-router-dom";
+import logoiii from "../assets/images/logoii.png";
+import LogoutDialog from "./dialog/LogoutDialog";
 import { Bars3Icon, XMarkIcon, BellIcon } from "@heroicons/react/24/outline";
+import { AuthContext } from "../context/AuthProvider";
 
 const Navbar = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const { isAuthenticated, user } = useContext(AuthContext);
 
+  // Reset image error when user changes
   useEffect(() => {
-    const checkAuth = () => {
-      const token = Cookies.get('token');
-      if (token) {
-        setIsLoggedIn(true);
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const user = JSON.parse(storedUser);
-          setUser(user.name || 'User');
-        }
-      } else {
-        setIsLoggedIn(false);
-        setUser('');
-      }
-    };
-
-    checkAuth();
-    window.addEventListener('storage', checkAuth);
-    return () => window.removeEventListener('storage', checkAuth);
-  }, []);
+    setImageError(false);
+  }, [user?.picture]);
 
   return (
     <>
@@ -41,23 +25,31 @@ const Navbar = () => {
               <img className="h-10" src={logoiii} alt="RUNTechSpace Logo" />
             </NavLink>
             <div className="hidden xl:flex xl:justify-center gap-16 xl:absolute xl:w-full xl:top-1/2 xl:left-1/2 xl:-translate-y-1/2 xl:-translate-x-1/2">
-              <NavLink className="navlinks" to="/">Home</NavLink>
-              <NavLink className="navlinks" to="/course">All Courses</NavLink>
-              <NavLink className="navlinks" to="/certification-exam">RTS Certification Exams</NavLink>
-              <NavLink className="navlinks" to="/about-us">About us</NavLink>
+              <NavLink className="navlinks" to="/">
+                Home
+              </NavLink>
+              <NavLink className="navlinks" to="/course">
+                All Courses
+              </NavLink>
+              <NavLink className="navlinks" to="/certification-exam">
+                RTS Certification Exams
+              </NavLink>
+              <NavLink className="navlinks" to="/about-us">
+                About us
+              </NavLink>
             </div>
             <div className="flex items-center space-x-4">
-              {!isLoggedIn ? (
+              {!isAuthenticated ? (
                 <>
                   <NavLink
                     to="/login"
-                    className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all"
+                    className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all cursor-pointer relative z-10"
                   >
                     Login
                   </NavLink>
                   <NavLink
                     to="/signup"
-                    className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all"
+                    className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all cursor-pointer relative z-10"
                   >
                     Signup
                   </NavLink>
@@ -68,22 +60,40 @@ const Navbar = () => {
                     <BellIcon className="w-8 h-8 text-blue-950 hover:text-slate-900 transition" />
                   </NavLink>
                   <NavLink to="/profile" className="cursor-pointer">
-                    <img
-                      src={user.picture || "https://i.pravatar.cc/300"}
-                      alt={user.name}
-                      className="w-14 h-14 object-cover rounded-full border-4 border-blue-950"
-                    />
+                    {user?.picture && !imageError ? (
+                      <img
+                        src={user.picture}
+                        alt={user?.name || "User"}
+                        className="w-14 h-14 object-cover rounded-full border-4 border-blue-950"
+                        onError={() => setImageError(true)}
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full border-4 border-blue-950 bg-blue-950 flex items-center justify-center text-white font-bold text-lg">
+                        {user?.name
+                          ? user.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                              .slice(0, 2)
+                          : "U"}
+                      </div>
+                    )}
                   </NavLink>
                   <button
-                    className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all hidden md:block"
+                    className="bg-slate-200 text-blue-950 px-4 py-2 rounded-lg text-lg font-medium hover:bg-blue-950 hover:text-white transition-all hidden md:block cursor-pointer relative z-10"
                     onClick={() => setShowLogoutModal(true)}
+                    type="button"
                   >
                     Logout
                   </button>
                 </>
               )}
             </div>
-            <button className="xl:hidden" onClick={() => setMobileNavOpen(!mobileNavOpen)}>
+            <button
+              className="xl:hidden"
+              onClick={() => setMobileNavOpen(!mobileNavOpen)}
+            >
               <Bars3Icon className="w-8 h-8 text-slate-900" />
             </button>
           </div>
@@ -93,17 +103,22 @@ const Navbar = () => {
       <LogoutDialog
         isOpen={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
-        setIsLoggedIn={setIsLoggedIn}
-        setUser={setUser}
       />
 
       {mobileNavOpen && (
         <div className="fixed top-0 left-0 bottom-0 w-5/6 max-w-xs z-[9999]">
-          <div className="fixed inset-0 bg-black opacity-20" onClick={() => setMobileNavOpen(false)}></div>
+          <div
+            className="fixed inset-0 bg-black opacity-20"
+            onClick={() => setMobileNavOpen(false)}
+          ></div>
           <nav className="relative p-8 w-full h-full bg-white overflow-y-auto">
             <div className="flex flex-col justify-between h-full">
               <div className="flex items-center justify-between">
-                <NavLink className="pr-4" to="/" onClick={() => setMobileNavOpen(false)}>
+                <NavLink
+                  className="pr-4"
+                  to="/"
+                  onClick={() => setMobileNavOpen(false)}
+                >
                   <img className="h-10" src={logoiii} alt="RUNTechSpace Logo" />
                 </NavLink>
                 <button onClick={() => setMobileNavOpen(false)}>
@@ -111,16 +126,28 @@ const Navbar = () => {
                 </button>
               </div>
               <div className="flex flex-col gap-8 py-16">
-                <NavLink className="max-w-max navlinks" to="/" onClick={() => setMobileNavOpen(false)}>
+                <NavLink
+                  className="max-w-max navlinks"
+                  to="/"
+                  onClick={() => setMobileNavOpen(false)}
+                >
                   Home
                 </NavLink>
-                <NavLink className="max-w-max navlinks" to="/course" onClick={() => setMobileNavOpen(false)}>
+                <NavLink
+                  className="max-w-max navlinks"
+                  to="/course"
+                  onClick={() => setMobileNavOpen(false)}
+                >
                   All Courses
                 </NavLink>
-                <NavLink className="max-w-max navlinks" to="/certification-exam" onClick={() => setMobileNavOpen(false)}>
+                <NavLink
+                  className="max-w-max navlinks"
+                  to="/certification-exam"
+                  onClick={() => setMobileNavOpen(false)}
+                >
                   Certification Exams
                 </NavLink>
-                {isLoggedIn && (
+                {isAuthenticated && (
                   <>
                     <NavLink
                       className="max-w-max navlinks"
@@ -130,13 +157,16 @@ const Navbar = () => {
                       Notifications
                     </NavLink>
                     <button
-                      className="max-w-max navlinks text-left"
-                      onClick={() => {
+                      type="button"
+                      className="max-w-max navlinks text-left cursor-pointer"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setMobileNavOpen(false);
                         setShowLogoutModal(true);
                       }}
                     >
-                      Logout
+                      <span className="pointer-events-none">Logout</span>
                     </button>
                   </>
                 )}
