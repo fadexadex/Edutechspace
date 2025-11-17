@@ -1,13 +1,14 @@
 // AdminUploadPage.jsx - Updated isAdmin usage
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { supabase } from "../../db/Superbase-client";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { useAuth } from "../../Auth/useAuth";
 import AdminLogin from "./AdminLogin";
+import { AuthContext } from "../context/AuthProvider";
 
 const AdminUploadPage = () => {
-  const { user, loading: authLoading, isAdmin, signOut } = useAuth();
+  const { user, loading: authLoading, isAdmin, logout } = useContext(AuthContext);
+  const isAdminUser = isAdmin?.();
   
   // Form and data states
   const [file, setFile] = useState(null);
@@ -32,14 +33,14 @@ const AdminUploadPage = () => {
 
   // Initial resources fetch when user is authenticated
   useEffect(() => {
-    if (!authLoading && user && isAdmin) {
+    if (!authLoading && user && isAdminUser) {
       fetchResources();
     }
-  }, [authLoading, user, isAdmin]);
+  }, [authLoading, user, isAdminUser]);
 
   // Fetch resources for a specific course
   const fetchResources = async () => {
-    if (!user || !isAdmin) return;
+    if (!user || !isAdminUser) return;
     if (!courseType) {
       await fetchAllResources();
       return;
@@ -109,10 +110,10 @@ const AdminUploadPage = () => {
 
   // Fetch resources when course selection changes
   useEffect(() => {
-    if (user && isAdmin && courseType !== undefined) {
+    if (user && isAdminUser && courseType !== undefined) {
       fetchResources();
     }
-  }, [courseType, user, isAdmin]);
+  }, [courseType, user, isAdminUser]);
 
   // Handle file upload or video link submission
   const handleUpload = async () => {
@@ -273,7 +274,7 @@ const AdminUploadPage = () => {
   }
 
   // Redirect or show unauthorized message if user is not an admin
-  if (!isAdmin) {
+  if (!isAdminUser) {
     return (
       <div className="max-w-4xl mx-auto p-6 mt-10 bg-white shadow-lg rounded-md text-center">
         <h2 className="text-2xl font-bold mb-6 text-gray-800">
@@ -283,7 +284,7 @@ const AdminUploadPage = () => {
           Your account ({user.email}) is not authorized to access the admin area.
         </p>
         <button
-          onClick={signOut}
+          onClick={logout}
           className="bg-red-500 hover:bg-red-600 text-white py-2 px-6 rounded-md transition"
         >
           Sign Out
@@ -303,7 +304,7 @@ const AdminUploadPage = () => {
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">{user.email}</span>
           <button
-            onClick={signOut}
+            onClick={logout}
             className="bg-red-500 hover:bg-red-600 text-white text-sm py-1 px-3 rounded transition"
           >
             Sign Out
