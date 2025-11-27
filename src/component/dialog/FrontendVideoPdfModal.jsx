@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
-import { supabase } from "../../../db/Superbase-client"; // Adjust path as needed
+import { supabase } from "../../utils/supabase";
+import { renderVideoPlayer } from "../../utils/videoUtils";
 
 const FrontendVideoPdfModal = ({ type, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -29,15 +30,13 @@ const FrontendVideoPdfModal = ({ type, onClose }) => {
         if (data && data.length > 0) {
           setResources(data);
         } else {
-          // Fallback to mock data if no resources found
-          console.warn('No resources found, using fallback data');
-          setResources(getFallbackData());
+          setResources([]);
+          setError(null); // No error, just no resources
         }
       } catch (err) {
         console.error('Error fetching resources:', err);
-        setError('Failed to load resources');
-        // Use fallback data on error
-        setResources(getFallbackData());
+        setError('Failed to load resources. Please try again later.');
+        setResources([]);
       } finally {
         setLoading(false);
       }
@@ -60,49 +59,23 @@ const FrontendVideoPdfModal = ({ type, onClose }) => {
 
   // Load saved index
   useEffect(() => {
-    const savedIndex = localStorage.getItem(`current-${type}-index-${courseType}`);
-    if (savedIndex) setCurrentIndex(parseInt(savedIndex));
-  }, [type, courseType]);
+    if (resources.length > 0) {
+      const savedIndex = localStorage.getItem(`current-${type}-index-${courseType}`);
+      if (savedIndex) {
+        const idx = parseInt(savedIndex);
+        if (idx >= 0 && idx < resources.length) {
+          setCurrentIndex(idx);
+        }
+      }
+    }
+  }, [type, courseType, resources.length]);
 
   // Save current index
   useEffect(() => {
-    localStorage.setItem(`current-${type}-index-${courseType}`, currentIndex);
-  }, [currentIndex, type, courseType]);
-
-  // Fallback data in case no resources are found
-  const getFallbackData = () => {
-    if (isVideo) {
-      return [
-        {
-          id: 1,
-          title: "Getting Started With HTML",
-          resource_url: "/videos/jsxvideo.mp4",
-          description: "This video introduces HTML, the foundation of all websites. You'll learn how to create and structure elements like headings, paragraphs, links, and lists, giving you a solid base for future frontend development."
-        },
-        {
-          id: 2,
-          title: "Introduction to CSS",
-          resource_url: "/videos/jsxvideo.mp4",
-          description: "Learn how to style your web pages using CSS. This lesson covers color, fonts, spacing, and layout techniques to make your websites visually appealing and responsive."
-        }
-      ];
-    } else {
-      return [
-        {
-          id: 1,
-          title: "HTML Guide",
-          resource_url: "https://www.researchgate.net/publication/333844149_Cyber_Security_Essentials",
-          description: "Comprehensive guide to HTML fundamentals and best practices for frontend developers."
-        },
-        {
-          id: 2,
-          title: "CSS Basics",
-          resource_url: "https://www.researchgate.net/publication/333844149_Cyber_Security_Essentials",
-          description: "Learn CSS from the ground up with this complete guide to styling web pages."
-        }
-      ];
+    if (resources.length > 0) {
+      localStorage.setItem(`current-${type}-index-${courseType}`, currentIndex);
     }
-  };
+  }, [currentIndex, type, courseType, resources.length]);
 
   const next = () => {
     if (currentIndex < resources.length - 1) setCurrentIndex(currentIndex + 1);
@@ -127,13 +100,28 @@ const FrontendVideoPdfModal = ({ type, onClose }) => {
   }
 
   // Show error state
-  if (error || resources.length === 0) {
+  if (error) {
     return (
       <Dialog open={true} onClose={onClose} className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 p-4">
         <DialogPanel className="bg-white p-6 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl">
           <DialogTitle className="text-xl sm:text-2xl font-bold mb-4 text-center">Error</DialogTitle>
           <div className="text-center py-8">
-            <p className="text-red-500 mb-4">{error || "No resources available"}</p>
+            <p className="text-red-500 mb-4">{error}</p>
+            <button onClick={onClose} className="bg-blue-950 text-white py-2 px-6 rounded-lg hover:bg-blue-800 transition">Close</button>
+          </div>
+        </DialogPanel>
+      </Dialog>
+    );
+  }
+
+  // Show empty state
+  if (!loading && resources.length === 0) {
+    return (
+      <Dialog open={true} onClose={onClose} className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 p-4">
+        <DialogPanel className="bg-white p-6 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl">
+          <DialogTitle className="text-xl sm:text-2xl font-bold mb-4 text-center">No Resources Available</DialogTitle>
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-4">There are no {isVideo ? 'video' : 'PDF'} resources available for this course yet.</p>
             <button onClick={onClose} className="bg-blue-950 text-white py-2 px-6 rounded-lg hover:bg-blue-800 transition">Close</button>
           </div>
         </DialogPanel>
@@ -142,6 +130,7 @@ const FrontendVideoPdfModal = ({ type, onClose }) => {
   }
 
   // Get current resource
+  if (resources.length === 0) return null;
   const currentResource = resources[currentIndex];
 
   return (
@@ -155,7 +144,11 @@ const FrontendVideoPdfModal = ({ type, onClose }) => {
         </div>
 
         {isVideo ? (
-          <video controls className="w-full h-[200px] sm:h-[350px] md:h-[450px] lg:h-[500px] rounded mb-4" src={currentResource.resource_url}></video>
+          renderVideoPlayer(
+            currentResource.resource_url,
+            currentResource.title,
+            "w-full h-[200px] sm:h-[350px] md:h-[450px] lg:h-[500px] rounded mb-4"
+          )
         ) : (
           <iframe
             title={currentResource.title}

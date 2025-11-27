@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Transition } from '@headlessui/react';
 import { Fragment } from 'react';
-import { supabase } from '../../db/Superbase-client';
+import { supabase } from '../utils/supabase';
 import { toast } from 'react-toastify';
 
-// Import course images
+// Import course images (fallback if image_url not in database)
 import cybersecurityImage from '../assets/images/cybersecurityImage.jpg';
 import machineLearningImage from '../assets/images/machineLearningImage.jpeg';
 import frontendImage from '../assets/images/frontendImage.jpg';
@@ -16,120 +16,17 @@ import uiuxImage from '../assets/images/uiuxImage.jpg';
 import dataAnalysesImage from '../assets/images/dataAnalysesImage.jpg';
 import aiImage from '../assets/images/aiImage.jpg';
 
-const courses = [
-  {
-    id: 'frontend',
-    title: 'Frontend Development',
-    description: 'Master front-end technologies and frameworks like Web5, React.',
-    image: frontendImage,
-    link: '/course/frontendcourse',
-    tags: ['Beginner', 'Frontend', 'React'],
-    duration: '6 weeks',
-    learningOutcomes: [
-      'Build responsive websites with HTML, CSS, and JavaScript.',
-      'Master React for dynamic user interfaces.',
-      'Understand Web5 concepts for modern web development.',
-    ],
-  },
-  {
-    id: 'cybersecurity',
-    title: 'Cybersecurity',
-    description: 'Gain essential skills in protecting networks and data.',
-    image: cybersecurityImage,
-    link: '/course/cybersecuritycourse',
-    tags: ['Intermediate', 'Cybersecurity'],
-    duration: '8 weeks',
-    learningOutcomes: [
-      'Secure networks against cyber threats.',
-      'Implement encryption and authentication protocols.',
-      'Conduct vulnerability assessments.',
-    ],
-  },
-  {
-    id: 'machinelearning',
-    title: 'Machine Learning',
-    description: 'Learn how AI models are built and applied in real-world scenarios.',
-    image: machineLearningImage,
-    link: '/course/mlcourse',
-    tags: ['Advanced', 'Machine Learning', 'AI'],
-    duration: '10 weeks',
-    learningOutcomes: [
-      'Train machine learning models with Python.',
-      'Apply ML algorithms to real-world problems.',
-      'Optimize models for better performance.',
-    ],
-  },
-  {
-    id: 'datascience',
-    title: 'Data Science',
-    description: 'Analyze and interpret complex data to inform decisions.',
-    image: dataScienceImage,
-    link: '/course/datasciencecourse',
-    tags: ['Intermediate', 'Data Science'],
-    duration: '8 weeks',
-    learningOutcomes: [
-      'Clean and preprocess datasets for analysis.',
-      'Use statistical methods to interpret data.',
-      'Create visualizations with tools like Matplotlib.',
-    ],
-  },
-  {
-    id: 'backend',
-    title: 'Backend Development',
-    description: 'Understand the fundamentals and creation of RESTful APIs. Master back-end languages and frameworks like Vanilla JavaScript, Node.js, Django, PHP.',
-    image: backendImage,
-    link: '/course/backendcourse',
-    tags: ['Intermediate', 'Backend', 'Node.js'],
-    duration: '6 weeks',
-    learningOutcomes: [
-      'Develop RESTful APIs with Node.js.',
-      'Manage databases with SQL and NoSQL.',
-      'Secure back-end applications.',
-    ],
-  },
-  {
-    id: 'uiux',
-    title: 'UI/UX',
-    description: 'Design intuitive and engaging user interfaces and experiences.',
-    image: uiuxImage,
-    link: '/course/uiuxcourse',
-    tags: ['Beginner', 'UI/UX', 'Design'],
-    duration: '5 weeks',
-    learningOutcomes: [
-      'Create wireframes and prototypes with Figma.',
-      'Apply UX principles for user-centered design.',
-      'Design visually appealing UI components.',
-    ],
-  },
-  {
-    id: 'dataanalysis',
-    title: 'Data Analyses',
-    description: 'Learn techniques to process, analyze, and visualize data effectively.',
-    image: dataAnalysesImage,
-    link: '/course/dataanalysiscourse',
-    tags: ['Intermediate', 'Data Analysis'],
-    duration: '7 weeks',
-    learningOutcomes: [
-      'Analyze datasets using Python and Pandas.',
-      'Visualize data with charts and graphs.',
-      'Interpret data trends for decision-making.',
-    ],
-  },
-  {
-    id: 'ai',
-    title: 'Artificial Intelligence',
-    description: 'Explore the concepts and applications of AI.',
-    image: aiImage,
-    link: '/course/aicourse',
-    tags: ['Advanced', 'AI'],
-    duration: '10 weeks',
-    learningOutcomes: [
-      'Understand AI concepts like neural networks.',
-      'Implement AI solutions with TensorFlow.',
-      'Explore ethical implications of AI.',
-    ],
-  },
-];
+// Image mapping for fallback (if database doesn't have image_url)
+const imageMap = {
+  'frontend': frontendImage,
+  'cybersecurity': cybersecurityImage,
+  'machinelearning': machineLearningImage,
+  'datascience': dataScienceImage,
+  'backend': backendImage,
+  'uiux': uiuxImage,
+  'dataanalysis': dataAnalysesImage,
+  'ai': aiImage,
+};
 
 const courseVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -146,6 +43,74 @@ const courseVariants = {
 
 const CourseDatabase = () => {
   const [hoveredCourse, setHoveredCourse] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch courses from Supabase
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const { data, error: fetchError } = await supabase
+          .from('courses')
+          .select('*')
+          .order('created_at', { ascending: true });
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        if (data) {
+          // Transform data to match component expectations
+          const transformedCourses = data.map((course) => {
+            // Helper function to parse tags/outcomes safely
+            const parseArrayField = (field) => {
+              if (!field) return [];
+              if (Array.isArray(field)) return field;
+              if (typeof field === 'string') {
+                // Try to parse as JSON first
+                if (field.trim().startsWith('[') || field.trim().startsWith('{')) {
+                  try {
+                    return JSON.parse(field);
+                  } catch (e) {
+                    // If JSON parsing fails, treat as comma-separated
+                    return field.split(',').map(item => item.trim()).filter(item => item);
+                  }
+                }
+                // Treat as comma-separated string
+                return field.split(',').map(item => item.trim()).filter(item => item);
+              }
+              return [];
+            };
+
+            return {
+              id: course.id,
+              title: course.title || course.name || 'Untitled Course',
+              description: course.description || '',
+              // Use image_url from database if available, otherwise fallback to local images
+              image: course.image_url || imageMap[course.id] || imageMap[course.id?.toLowerCase()] || frontendImage,
+              link: course.link || course.route || `/course/${course.id}`,
+              tags: parseArrayField(course.tags),
+              duration: course.duration || (course.duration_weeks ? `${course.duration_weeks} weeks` : 'N/A'),
+              learningOutcomes: parseArrayField(course.learning_outcomes),
+            };
+          });
+          
+          setCourses(transformedCourses);
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to fetch courses');
+        toast.error('Failed to load courses. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
 
   const enrollCourse = async (courseId) => {
     try {
@@ -163,7 +128,6 @@ const CourseDatabase = () => {
       toast.success('Enrolled successfully!');
     } catch (err) {
       toast.error('Failed to enroll');
-      console.error(err);
     }
   };
 
@@ -176,8 +140,30 @@ const CourseDatabase = () => {
         <p className="text-xl text-neutral-600 text-center mt-4">
           Discover a list of carefully picked courses with certifications to get you started on your tech journey!
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-10 relative z-0">
-          {courses.map((course, index) => (
+        
+        {loading && (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-neutral-900 border-t-transparent"></div>
+            <p className="text-neutral-600 mt-4">Loading courses...</p>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="text-center py-12">
+            <p className="text-red-600 text-lg">Error: {error}</p>
+            <p className="text-neutral-600 mt-2">Please check your connection and try again.</p>
+          </div>
+        )}
+
+        {!loading && !error && courses.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-neutral-600 text-lg">No courses available at the moment.</p>
+          </div>
+        )}
+
+        {!loading && !error && courses.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-10 relative z-0">
+            {courses.map((course, index) => (
             <motion.div
               key={course.id}
               variants={courseVariants}
@@ -188,11 +174,9 @@ const CourseDatabase = () => {
               <div
                 className="relative bg-white rounded-lg shadow-lg overflow-hidden"
                 onMouseEnter={() => {
-                  console.log('Hovering over course:', course.id);
                   setHoveredCourse(course.id);
                 }}
                 onMouseLeave={() => {
-                  console.log('Leaving course:', course.id);
                   setHoveredCourse(null);
                 }}
               >
@@ -254,7 +238,8 @@ const CourseDatabase = () => {
               </div>
             </motion.div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -1,45 +1,63 @@
-import { createContext, useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { createContext, useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { supabase } from '../../db/Superbase-client';
+import { supabase, isSupabaseConfigured } from '../utils/supabase';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const isSyncingUser = useRef(false);
+  const isInitialized = useRef(false);
+
+  // Stable navigation function that doesn't cause re-renders
+  const navigateToLogin = useCallback(() => {
+    // Use window.location for navigation to avoid React Router issues
+    if (window.location.pathname !== '/login' && window.location.pathname !== '/admin/login') {
+      window.location.href = '/login';
+    }
+  }, []);
 
   useEffect(() => {
+    // Prevent multiple initializations
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured) {
+      console.error('Supabase is not configured. Please set environment variables.');
+      setLoading(false);
+      return;
+    }
+
     const initializeAuth = async () => {
-      setLoading(true);
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('initializeAuth: Error getting session:', error.message);
-          throw error;
+          console.error('Session error:', error);
+          setLoading(false);
+          return;
         }
 
         if (session) {
-          console.log('initializeAuth: Session found for:', session.user.email);
           if (!isSyncingUser.current) {
             isSyncingUser.current = true;
             try {
               await syncUser(session.user);
+            } catch (err) {
+              console.error('Sync user error on init:', err);
+              setLoading(false);
             } finally {
               isSyncingUser.current = false;
             }
           }
         } else {
-          console.log('initializeAuth: No active session');
           setLoading(false);
         }
       } catch (err) {
-        console.error('initializeAuth: Unexpected error:', err);
-        toast.error('An error occurred during authentication.');
+        console.error('Auth initialization error:', err);
         setLoading(false);
       }
     };
@@ -48,13 +66,14 @@ export const AuthProvider = ({ children }) => {
 
     // Listen for Supabase auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
-      
+      // Prevent navigation loops
       if (event === 'SIGNED_IN' && session) {
         if (!isSyncingUser.current) {
           isSyncingUser.current = true;
           try {
             await syncUser(session.user);
+          } catch (err) {
+            console.error('Sync user error on sign in:', err);
           } finally {
             isSyncingUser.current = false;
           }
@@ -62,20 +81,21 @@ export const AuthProvider = ({ children }) => {
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsAuthenticated(false);
-        toast.info('You have been logged out.');
-        navigate('/login');
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log('Token refreshed successfully');
+        // Only navigate if not already on login page
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/admin/login') {
+          navigateToLogin();
+        }
       }
     });
 
     return () => {
-      authListener.subscription.unsubscribe();
+      if (authListener?.subscription) {
+        authListener.subscription.unsubscribe();
+      }
     };
-  }, [navigate]);
+  }, [navigateToLogin]);
 
   const syncUser = async (supabaseUser) => {
-    console.log('syncUser: Starting for user:', supabaseUser.email);
     try {
       // Check if user exists in our users table
       const { data: existingUser, error: selectError } = await supabase
@@ -87,35 +107,42 @@ export const AuthProvider = ({ children }) => {
       let userData;
 
       if (selectError && selectError.code !== 'PGRST116') {
-        console.error('syncUser: Error checking existing user:', selectError.message);
         throw new Error(selectError.message);
       }
 
       if (existingUser) {
-        console.log('syncUser: Existing user found:', existingUser.email);
-        
-        // Update user with latest info from auth metadata
+        // IMPORTANT: Always fetch fresh role from database (don't update it)
+        // This ensures role changes in DB are reflected immediately
+        const { data: refreshedUser, error: refreshError } = await supabase
+          .from('users')
+          .select('id, name, email, picture, ongoingcourses, completedcourses, phone, role')
+          .eq('id', existingUser.id)
+          .single();
+
+        if (refreshError) {
+          throw new Error(refreshError.message);
+        }
+
+        // Update user with latest info from auth metadata (but preserve role from DB)
         const { data: updatedUser, error: updateError } = await supabase
           .from('users')
           .update({
-            name: supabaseUser.user_metadata?.name || existingUser.name,
-            picture: supabaseUser.user_metadata?.picture || existingUser.picture,
-            phone: supabaseUser.user_metadata?.phone || existingUser.phone,
+            name: supabaseUser.user_metadata?.name || refreshedUser.name,
+            picture: supabaseUser.user_metadata?.picture || refreshedUser.picture,
+            phone: supabaseUser.user_metadata?.phone || refreshedUser.phone,
+            // DO NOT update role - keep it from database
+            role: refreshedUser.role || 'user',
           })
           .eq('id', existingUser.id)
           .select('id, name, email, picture, ongoingcourses, completedcourses, phone, role')
           .single();
 
         if (updateError) {
-          console.error('syncUser: Error updating user:', updateError.message);
           throw new Error(updateError.message);
         }
         
         userData = updatedUser;
-        console.log('syncUser: User updated successfully');
       } else {
-        console.log('syncUser: Creating new user');
-        
         // Create new user record
         const { data: newUser, error: insertError } = await supabase
           .from('users')
@@ -133,29 +160,39 @@ export const AuthProvider = ({ children }) => {
           .single();
 
         if (insertError) {
-          console.error('syncUser: Error creating user:', insertError.message);
           throw new Error(insertError.message);
         }
         
         userData = newUser;
-        console.log('syncUser: New user created successfully');
       }
 
-      // Set user state
+      // Set user state with fresh data
       setUser(userData);
       setIsAuthenticated(true);
       setLoading(false);
       
+      // Debug log in development
+      if (import.meta.env.DEV) {
+        console.log('✅ User synced:', {
+          email: userData.email,
+          role: userData.role,
+          isAdmin: userData.role === 'admin'
+        });
+      }
+      
     } catch (err) {
-      console.error('syncUser: Error:', err.message);
-      toast.error('Failed to sync user account.');
+      console.error('❌ Sync user error:', err);
+      // Don't show toast on every error - might be RLS or network issues
+      // Only show for critical errors
+      if (err.message && !err.message.includes('row-level security')) {
+        toast.error('Failed to sync user account.');
+      }
       setLoading(false);
-      throw err;
+      // Don't throw - allow app to continue
     }
   };
 
   const login = async (email, password) => {
-    setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -166,20 +203,17 @@ export const AuthProvider = ({ children }) => {
         throw error;
       }
 
-      console.log('login: User logged in:', data.user.email);
       // syncUser will be called by onAuthStateChange listener
+      // Don't set loading here - let the auth state change handle it
       
     } catch (err) {
-      console.error('login: Error:', err.message);
       const errorMsg = err.message || 'Failed to log in';
       toast.error(errorMsg);
-      setLoading(false);
       throw err;
     }
   };
 
   const signup = async (name, email, password, phone = '') => {
-    setLoading(true);
     try {
       // Sign up with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
@@ -197,13 +231,10 @@ export const AuthProvider = ({ children }) => {
         throw error;
       }
 
-      console.log('signup: User signed up:', data.user?.email);
-      
       // Check if email confirmation is required
       if (data.user && !data.session) {
         toast.info('Please check your email to confirm your account.');
-        setLoading(false);
-        navigate('/login');
+        window.location.href = '/login';
         return;
       }
 
@@ -212,39 +243,58 @@ export const AuthProvider = ({ children }) => {
       toast.success('Account created successfully!');
       
     } catch (err) {
-      console.error('signup: Error:', err.message);
       const errorMsg = err.message || 'Failed to sign up';
       toast.error(errorMsg);
-      setLoading(false);
       throw err;
     }
   };
 
-  const googleLogin = async () => {
+  const googleLogin = async (redirectTo = '/course') => {
     setLoading(true);
     try {
+      // In development, always use localhost
+      // In production, use window.location.origin
+      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const baseUrl = isDevelopment 
+        ? `http://localhost:${window.location.port || '5173'}`
+        : window.location.origin;
+
+      // Ensure redirect URL is properly formatted
+      const redirectUrl = redirectTo.startsWith('/') 
+        ? `${baseUrl}${redirectTo}`
+        : redirectTo;
+
+      console.log('🔐 Google OAuth redirect URL:', redirectUrl);
+      console.log('🔐 Current origin:', window.location.origin);
+      console.log('🔐 Is development:', isDevelopment);
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/course`,
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
 
       if (error) {
+        console.error('Google OAuth error:', error);
         throw error;
       }
       
       // Don't set loading to false here - the redirect will happen
+      // The browser will redirect to Google, then back to redirectUrl
     } catch (err) {
-      console.error('googleLogin: Error:', err.message);
-      toast.error('Failed to log in with Google');
+      console.error('Google login error:', err);
+      toast.error('Failed to log in with Google: ' + (err.message || 'Unknown error'));
       setLoading(false);
       throw err;
     }
   };
 
   const logout = async () => {
-    setLoading(true);
     try {
       const { error } = await supabase.auth.signOut();
       
@@ -255,21 +305,20 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       toast.success('Logged out successfully!');
-      navigate('/');
+      
+      // Use window.location to avoid React Router navigation issues
+      window.location.href = '/';
       
     } catch (err) {
-      console.error('logout: Error:', err.message);
+      console.error('Logout error:', err);
       toast.error('Failed to log out');
       setUser(null);
       setIsAuthenticated(false);
-      navigate('/');
-    } finally {
-      setLoading(false);
+      window.location.href = '/';
     }
   };
 
   const fetchProfile = async () => {
-    setLoading(true);
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
@@ -277,6 +326,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No active session');
       }
 
+      // Always fetch fresh data from database (especially role)
       const { data: userData, error } = await supabase
         .from('users')
         .select('id, name, email, picture, ongoingcourses, completedcourses, phone, role')
@@ -287,19 +337,27 @@ export const AuthProvider = ({ children }) => {
         throw error;
       }
 
+      // Update state with fresh data
       setUser(userData);
       setIsAuthenticated(true);
-      toast.success('Profile loaded successfully!');
+      
+      // Debug log in development
+      if (import.meta.env.DEV) {
+        console.log('✅ Profile fetched:', {
+          email: userData.email,
+          role: userData.role,
+          isAdmin: userData.role === 'admin'
+        });
+      }
+      
       return userData;
       
     } catch (err) {
-      console.error('fetchProfile: Error:', err.message);
+      console.error('❌ Fetch profile error:', err);
       toast.error('Failed to fetch profile');
       setIsAuthenticated(false);
       setUser(null);
       throw err;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -328,11 +386,10 @@ export const AuthProvider = ({ children }) => {
       
       setUser(null);
       setIsAuthenticated(false);
-      navigate('/');
+      window.location.href = '/';
       toast.success('Account deleted successfully!');
       
     } catch (err) {
-      console.error('deleteAccount: Error:', err.message);
       toast.error('Failed to delete account');
       throw err;
     } finally {
@@ -341,7 +398,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isAdmin = () => {
-    return user?.role === 'admin';
+    const adminCheck = user?.role === 'admin';
+    
+    // Debug log in development
+    if (import.meta.env.DEV) {
+      console.log('🔐 Admin check:', {
+        hasUser: !!user,
+        userEmail: user?.email,
+        userRole: user?.role,
+        isAdmin: adminCheck
+      });
+    }
+    
+    return adminCheck;
   };
 
   const contextValue = {

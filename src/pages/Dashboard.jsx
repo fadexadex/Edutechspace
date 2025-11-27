@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useContext } from "react";
-import { motion } from "framer-motion";
 import { UserCircleIcon, CheckCircleIcon, BookOpenIcon, FlagIcon, ClockIcon } from "@heroicons/react/24/solid";
 import { AuthContext } from "../context/AuthProvider";
 import { toast } from "react-toastify";
-import axios from "axios";
+import { supabase } from "../utils/supabase";
 import UserGoalDialog from "../component/dialog/UserGoalDialog";
 import CourseProgress from "../component/CourseProgress";
 import LoadingPage from "./LoadingPage";
@@ -19,31 +18,50 @@ const UserDashboard = () => {
   useEffect(() => {
     const loadUserData = async () => {
       setLoading(true);
-      console.log("Dashboard: loadUserData - Starting");
+      setError(null);
       try {
         if (!user && !authLoading) {
-          console.log("Dashboard: No user, fetching profile...");
           await fetchProfile();
         }
 
         if (user && user.id) {
-          console.log("Dashboard: Fetching course progress for userId:", user.id);
-          const response = await axios.get(`http://localhost:8000/api/course/progress/${user.id}`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          });
-          console.log("Dashboard: Course progress data:", response.data);
-          setCourseProgress(response.data);
+          // Fetch course progress from Supabase
+          const { data, error: fetchError } = await supabase
+            .from('courses_enrolled')
+            .select(`
+              *,
+              courses (
+                id,
+                title,
+                description,
+                image_url
+              )
+            `)
+            .eq('user_id', user.id)
+            .order('enrolled_at', { ascending: false });
+
+          if (fetchError) {
+            throw fetchError;
+          }
+
+          // Transform data to match component expectations
+          const transformedProgress = (data || []).map(enrollment => ({
+            course_id: enrollment.course_id,
+            course_name: enrollment.courses?.title || 'Unnamed Course',
+            completed: enrollment.completed || false,
+            progress: enrollment.progress || 0,
+            enrolled_at: enrollment.enrolled_at,
+            completed_at: enrollment.completed_at,
+          }));
+
+          setCourseProgress(transformedProgress);
         }
       } catch (err) {
-        console.error("Dashboard: Error fetching data:", err);
-        const errorMsg = err.response?.data?.error || "Failed to load dashboard data";
+        const errorMsg = err.message || "Failed to load dashboard data";
         setError(errorMsg);
         toast.error(errorMsg);
       } finally {
         setLoading(false);
-        console.log("Dashboard: loadUserData - Finished");
       }
     };
 
@@ -51,21 +69,16 @@ const UserDashboard = () => {
   }, [user, authLoading, fetchProfile]);
 
   if (loading || authLoading) {
-    console.log("Dashboard: Rendering - Loading state");
     return <LoadingPage />;
   }
 
   if (error) {
-    console.log("Dashboard: Rendering - Error state:", error);
     return <div className="text-red-500 text-center mt-20">Error: {error}</div>;
   }
 
   if (!user) {
-    console.log("Dashboard: Rendering - No user data");
     return <div className="text-gray-500 text-center mt-20">Please log in to view your dashboard.</div>;
   }
-
-  console.log("Dashboard: Rendering - User data:", user);
 
   return (
     <div className="bg-gray-100 min-h-screen p-6">

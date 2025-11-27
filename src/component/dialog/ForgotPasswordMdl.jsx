@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog,DialogPanel,DialogTitle, Transition,TransitionChild, } from '@headlessui/react';
 import { Fragment } from 'react';
 import { toast } from 'react-toastify';
-import { supabase } from '../../../db/Superbase-client';
+import { supabase } from '../../utils/supabase';
 
 const ForgotPasswordMdl = ({ isOpen, onClose }) => {
   const [email, setEmail] = useState('');

@@ -4,7 +4,7 @@ import { AuthContext } from "../context/AuthProvider";
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { Fragment } from 'react';
 import { toast } from 'react-toastify';
-import { supabase } from "../../db/Superbase-client";
+import { supabase } from "../utils/supabase";
 import Cookies from 'js-cookie';
 
 const UserProfile = () => {

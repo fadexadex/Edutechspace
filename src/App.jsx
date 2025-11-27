@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useContext } from 'react';
+import { AuthContext } from './context/AuthProvider';
 import MainLayout from './layout/MainLayout';
 import LoadingPage from './pages/LoadingPage';
 import Home from './pages/Home';
@@ -13,12 +14,6 @@ import AboutUs from './pages/AboutUs';
 import NotFound from './component/NotFoundPage';
 import CertificateExam from './pages/CertificationExam';
 import ExamPage from './ExamPages/ExamPage';
-import { frontendExam } from './ExamPages/Data/FrontendExam';
-import { dataScienceExam } from './ExamPages/Data/DataScienceExam';
-import { uiuxExam } from './ExamPages/Data/UiUxExam';
-import { backendExam } from './ExamPages/Data/BackendExam';
-import { aiExam } from './ExamPages/Data/AiExam';
-import { cyberSecurityExam } from './ExamPages/Data/CyberSecurityExam';
 import CyberSecurityStack from './stacks/CyberSecurityStack';
 import FrontendDevStack from './stacks/FrontendDevStack';
 import BackendDevStack from './stacks/BackendDevStack';
@@ -28,73 +23,93 @@ import MLStack from './stacks/MLStack';
 import AiStack from './stacks/AiStack';
 import UserDashboard from './pages/Dashboard';
 import ProtectedRoute from './component/ProtectedRoute';
-import AdminUploadPage from './pages/AdminUploadPage';
+import AdminLayout from './admin/AdminLayout';
+import AdminLogin from './admin/pages/AdminLogin';
+import AdminDashboard from './admin/pages/AdminDashboard';
+import ResourceUpload from './admin/pages/ResourceUpload';
+import AdminCourses from './admin/pages/AdminCourses';
+import AdminCourseForm from './admin/pages/AdminCourseForm';
+import AdminResources from './admin/pages/AdminResources';
+import AdminExams from './admin/pages/AdminExams';
+import AdminUsers from './admin/pages/AdminUsers';
+import { isSupabaseConfigured } from './utils/supabase';
 
 const App = () => {
-  const [isLoading, setIsLoading] = useState(true);
+  const { loading } = useContext(AuthContext);
 
-  useEffect(() => {
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 3000); // Ensure the loading screen stays for 3 seconds
-  }, []);
-
-  if (isLoading) {
-    return <LoadingPage />;
+  // Show error message if Supabase is not configured
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl w-full">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">⚠️ Configuration Error</h1>
+          <p className="text-gray-700 mb-4">
+            Supabase environment variables are not configured. Please set up your environment variables.
+          </p>
+          <div className="bg-gray-50 p-4 rounded mb-4">
+            <p className="text-sm font-semibold mb-2">Create a <code className="bg-gray-200 px-2 py-1 rounded">.env.local</code> file in the root directory with:</p>
+            <pre className="text-sm bg-gray-900 text-green-400 p-3 rounded overflow-x-auto">
+{`VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
+            </pre>
+          </div>
+          <p className="text-sm text-gray-600">
+            See <code className="bg-gray-200 px-2 py-1 rounded">SETUP_GUIDE.md</code> for detailed instructions.
+          </p>
+        </div>
+      </div>
+    );
   }
+
+  // Don't block rendering with loading - let routes handle their own loading states
+  // This prevents blank pages during navigation
 
   return (
     <Routes>
+      {/* Admin login outside MainLayout */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      
       <Route path="/" element={<MainLayout />}>
         {/* Public Routes */}
         <Route index element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/about-us" element={<AboutUs />} />
-        <Route path="/coursedatabase" element={<CourseDatabase />} />
-        <Route path="/course/frontendcourse" element={<FrontendDevStack />} />
-        <Route path="/course/backendcourse" element={<BackendDevStack />} />
+        <Route path="login" element={<Login />} />
+        <Route path="signup" element={<Signup />} />
+        <Route path="about-us" element={<AboutUs />} />
+        <Route path="coursedatabase" element={<CourseDatabase />} />
+        <Route path="course/frontendcourse" element={<FrontendDevStack />} />
+        <Route path="course/backendcourse" element={<BackendDevStack />} />
 
         {/* Protected Routes (require authentication) */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/course" element={<Course />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/dashboard" element={<UserDashboard />} />
-          <Route path="/course/cybersecuritycourse" element={<CyberSecurityStack />} />
-          <Route path="/course/datasciencecourse" element={<DataScienceStack />} />
-          <Route path="/course/mlcourse" element={<MLStack />} />
-          <Route path="/course/uiuxcourse" element={<UiUxStack />} />
-          <Route path="/course/aicourse" element={<AiStack />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/certification-exam" element={<CertificateExam />} />
-          <Route
-            path="/certification-exam/frontend"
-            element={
-              <ExamPage
-                title={frontendExam.title}
-                instructions={frontendExam.instructions}
-                timeLimit={frontendExam.timeLimit}
-                passingScore={frontendExam.passingScore}
-                onSuccessLink={frontendExam.onSuccessLink}
-                questionsData={frontendExam.questionData}
-              />
-            }
-          />
-          <Route path="/certification-exam/datascience" element={<ExamPage {...dataScienceExam} />} />
-          <Route path="/certification-exam/uiux" element={<ExamPage {...uiuxExam} />} />
-          <Route path="/certification-exam/backend" element={<ExamPage {...backendExam} />} />
-          <Route path="/certification-exam/cybersecurity" element={<ExamPage {...cyberSecurityExam} />} />
-          <Route path="/certification-exam/AI" element={<ExamPage {...aiExam} />} />
-          <Route path="/certification-exam/machine-learning" element={<ExamPage {...aiExam} />} />
-        </Route>
-
-        {/* Admin Routes (require authentication and admin privileges) */}
-        <Route element={<ProtectedRoute requireAdmin={true} />}>
-          <Route path="/admin/resource-upload" element={<AdminUploadPage />} />
+          <Route path="course" element={<Course />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="dashboard" element={<UserDashboard />} />
+          <Route path="course/cybersecuritycourse" element={<CyberSecurityStack />} />
+          <Route path="course/datasciencecourse" element={<DataScienceStack />} />
+          <Route path="course/mlcourse" element={<MLStack />} />
+          <Route path="course/uiuxcourse" element={<UiUxStack />} />
+          <Route path="course/aicourse" element={<AiStack />} />
+          <Route path="contact" element={<Contact />} />
+          <Route path="certification-exam" element={<CertificateExam />} />
+          <Route path="certification-exam/:examType" element={<ExamPage />} />
         </Route>
 
         {/* Catch-all for Not Found */}
         <Route path="*" element={<NotFound />} />
+      </Route>
+
+      {/* Admin Routes - outside MainLayout for cleaner admin UI */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="courses" element={<AdminCourses />} />
+        <Route path="courses/create" element={<AdminCourseForm />} />
+        <Route path="courses/edit/:id" element={<AdminCourseForm />} />
+        <Route path="resources" element={<AdminResources />} />
+        <Route path="resources/upload" element={<ResourceUpload />} />
+        <Route path="resources/edit/:id" element={<ResourceUpload />} />
+        <Route path="exams" element={<AdminExams />} />
+        <Route path="users" element={<AdminUsers />} />
       </Route>
     </Routes>
   );

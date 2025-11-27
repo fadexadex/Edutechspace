@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
-import { supabase } from "../../../db/Superbase-client"; // Adjust path as needed
+import { supabase } from "../../utils/supabase";
+import { renderVideoPlayer } from "../../utils/videoUtils";
 
 const BackendVideoPdfModal = ({ type, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -29,15 +30,13 @@ const BackendVideoPdfModal = ({ type, onClose }) => {
         if (data && data.length > 0) {
           setResources(data);
         } else {
-          // Fallback to mock data if no resources found
-          console.warn('No resources found, using fallback data');
-          setResources(getFallbackData());
+          setResources([]);
+          setError(null);
         }
       } catch (err) {
         console.error('Error fetching resources:', err);
-        setError('Failed to load resources');
-        // Use fallback data on error
-        setResources(getFallbackData());
+        setError('Failed to load resources. Please try again later.');
+        setResources([]);
       } finally {
         setLoading(false);
       }
@@ -60,65 +59,23 @@ const BackendVideoPdfModal = ({ type, onClose }) => {
 
   // Load saved index
   useEffect(() => {
-    const savedIndex = localStorage.getItem(`current-${type}-index-${courseType}`);
-    if (savedIndex) setCurrentIndex(parseInt(savedIndex));
-  }, [type, courseType]);
+    if (resources.length > 0) {
+      const savedIndex = localStorage.getItem(`current-${type}-index-${courseType}`);
+      if (savedIndex) {
+        const idx = parseInt(savedIndex);
+        if (idx >= 0 && idx < resources.length) {
+          setCurrentIndex(idx);
+        }
+      }
+    }
+  }, [type, courseType, resources.length]);
 
   // Save current index
   useEffect(() => {
-    localStorage.setItem(`current-${type}-index-${courseType}`, currentIndex);
-  }, [currentIndex, type, courseType]);
-
-  // Fallback data in case no resources are found
-  const getFallbackData = () => {
-    if (isVideo) {
-      return [
-        {
-          id: 1,
-          title: "Introduction to Backend Development",
-          resource_url: "/videos/jsxvideo.mp4",
-          requirement: "No prior backend knowledge required.",
-          description: "An overview of what backend development is, core responsibilities, technologies used, and how it differs from frontend development."
-        },
-        {
-          id: 2,
-          title: "Server, Client & APIs",
-          resource_url: "/videos/jsxvideo.mp4",
-          requirement: "Basic web knowledge (HTML/CSS) recommended.",
-          description: "Understand how servers, clients, and APIs interact in a client-server architecture. Learn about REST and how backend communicates with frontend."
-        },
-        {
-          id: 3,
-          title: "Databases & Data Modeling",
-          resource_url: "/videos/jsxvideo.mp4",
-          requirement: "Familiarity with CRUD operations helpful.",
-          description: "Learn about relational (SQL) and non-relational (NoSQL) databases, how to model data, and interact with them in backend applications."
-        },
-        {
-          id: 4,
-          title: "Authentication & Authorization",
-          resource_url: "/videos/jsxvideo.mp4",
-          requirement: "Basic understanding of web security concepts.",
-          description: "Learn about user authentication and authorization, including JWT, OAuth, and session management."
-        },
-      ];
-    } else {
-      return [
-        {
-          id: 1,
-          title: "Backend Developer Roadmap",
-          resource_url: "https://roadmap.sh/backend",
-          description: "Comprehensive roadmap for becoming a backend developer with key technologies and concepts."
-        },
-        {
-          id: 2,
-          title: "REST API Design Best Practices",
-          resource_url: "https://www.restapitutorial.com/downloads/rest_api_tutorial.pdf",
-          description: "A guide to designing robust and maintainable REST APIs for your backend services."
-        }
-      ];
+    if (resources.length > 0) {
+      localStorage.setItem(`current-${type}-index-${courseType}`, currentIndex);
     }
-  };
+  }, [currentIndex, type, courseType, resources.length]);
 
   const next = () => {
     if (currentIndex < resources.length - 1) setCurrentIndex(currentIndex + 1);
@@ -143,13 +100,28 @@ const BackendVideoPdfModal = ({ type, onClose }) => {
   }
 
   // Show error state
-  if (error || resources.length === 0) {
+  if (error) {
     return (
       <Dialog open={true} onClose={onClose} className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 p-4">
         <DialogPanel className="bg-white p-6 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl">
           <DialogTitle className="text-xl sm:text-2xl font-bold mb-4 text-center">Error</DialogTitle>
           <div className="text-center py-8">
-            <p className="text-red-500 mb-4">{error || "No resources available"}</p>
+            <p className="text-red-500 mb-4">{error}</p>
+            <button onClick={onClose} className="bg-blue-950 text-white py-2 px-6 rounded-lg hover:bg-blue-800 transition">Close</button>
+          </div>
+        </DialogPanel>
+      </Dialog>
+    );
+  }
+
+  // Show empty state
+  if (!loading && resources.length === 0) {
+    return (
+      <Dialog open={true} onClose={onClose} className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 p-4">
+        <DialogPanel className="bg-white p-6 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl">
+          <DialogTitle className="text-xl sm:text-2xl font-bold mb-4 text-center">No Resources Available</DialogTitle>
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-4">There are no {isVideo ? 'video' : 'PDF'} resources available for this course yet.</p>
             <button onClick={onClose} className="bg-blue-950 text-white py-2 px-6 rounded-lg hover:bg-blue-800 transition">Close</button>
           </div>
         </DialogPanel>
@@ -158,6 +130,7 @@ const BackendVideoPdfModal = ({ type, onClose }) => {
   }
 
   // Get current resource
+  if (resources.length === 0) return null;
   const currentResource = resources[currentIndex];
 
   return (
@@ -171,7 +144,11 @@ const BackendVideoPdfModal = ({ type, onClose }) => {
         </div>
 
         {isVideo ? (
-          <video controls className="w-full h-[200px] sm:h-[350px] md:h-[450px] lg:h-[500px] rounded mb-4" src={currentResource.resource_url}></video>
+          renderVideoPlayer(
+            currentResource.resource_url,
+            currentResource.title,
+            "w-full h-[200px] sm:h-[350px] md:h-[450px] lg:h-[500px] rounded mb-4"
+          )
         ) : (
           <iframe
             title={currentResource.title}

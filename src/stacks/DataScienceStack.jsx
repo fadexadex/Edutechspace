@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { UserIcon, StarIcon, CheckIcon } from '@heroicons/react/24/solid';
-import { InfinityIcon,BarChart3 } from 'lucide-react';
+import { InfinityIcon, BarChart3, FileText, Video, Clock, BookOpen, PlayCircle } from 'lucide-react';
+import { supabase } from '../utils/supabase';
 import datascienceHeaderimg from '../assets/images/datascienceImagejpg (1).jpg';
 import videoimg1 from '../assets/images/datascienceImagejpg (4).jpg';
 import videoimg2 from '../assets/images/datascienceImagejpg (3).jpg';
@@ -16,8 +17,7 @@ const sections = [
   { id: 'benefits', title: '🚀 Key Benefits' },
   { id: 'learn', title: '🎓 What You Will Learn' },
   { id: 'requirements', title: '🧰 What You Will Need' },
-  { id: 'pdf', title: '🧾 PDF Resources' },
-  { id: 'videos', title: '🎥 Video Resources' },
+  { id: 'pdf', title: '📚 Course Resources' },
   { id: 'recommendation', title: 'Course Recommendation' },
 ];
 
@@ -26,47 +26,58 @@ const DataScienceStack = () => {
   const [modalType, setModalType] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [videoResources, setVideoResources] = useState([]);
+  const [pdfResources, setPdfResources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeResourceTab, setActiveResourceTab] = useState('pdf'); // 'pdf' or 'video'
   const sizes = ['w-5 h-5', 'w-6 h-6', 'w-7 h-7', 'w-8 h-8'];
 
-  // Dummy data
-  const videoResources = [
-    {
-      id: 1,
-      title: 'Introduction to DataScience',
-      description: 'Introductory overview of data science, its lifecycle, and its applications across industries.',
-      duration: '10:25',
-      image: videoimg1,
-    },
-    {
-      id: 2,
-      title: 'Exploratory Data Analysis (EDA)',
-      description: 'Learn how to explore and clean datasets using visualization and summary statistics.',
-      duration: '12:30',
-      image: videoimg2,
-    },
-    {
-      id: 3,
-      title: 'Data Wrangling with Pandas',
-      description: 'Dive into real-life data cleaning, formatting, and feature engineering with Pandas.',
-      duration: '15:00',
-      image: videoimg3,
-    },
-  ];
+  // Fetch resources from Supabase
+  useEffect(() => {
+    const fetchResources = async () => {
+      try {
+        setLoading(true);
+        const courseType = "Data Science";
+        
+        const { data: videos, error: videoError } = await supabase
+          .from('course_resources')
+          .select('*')
+          .eq('course_type', courseType)
+          .eq('resource_type', 'Video')
+          .order('created_at', { ascending: false });
 
-  const pdfResources = [
-    {
-      id: 1,
-      title: 'Data Science Handbook (PDF)',
-      description: 'A complete walkthrough on data science fundamentals.',
-      image: pdfimg1,
-    },
-    {
-      id: 2,
-      title: 'Pandas Cheat Sheet (PDF)',
-      description: 'Understand data science frameworks.',
-      image: pdfimg2,
-    },
-  ];
+        const { data: pdfs, error: pdfError } = await supabase
+          .from('course_resources')
+          .select('*')
+          .eq('course_type', courseType)
+          .eq('resource_type', 'PDF')
+          .order('created_at', { ascending: false });
+
+        if (videoError) console.error('Error fetching videos:', videoError);
+        if (pdfError) console.error('Error fetching PDFs:', pdfError);
+
+        const mappedVideos = (videos || []).map((video, idx) => ({
+          ...video,
+          image: video.thumbnail_url || [videoimg1, videoimg2, videoimg3][idx % 3] || videoimg1,
+          duration: video.duration || 'N/A'
+        }));
+
+        const mappedPdfs = (pdfs || []).map((pdf, idx) => ({
+          ...pdf,
+          image: pdf.thumbnail_url || [pdfimg1, pdfimg2][idx % 2] || pdfimg1
+        }));
+
+        setVideoResources(mappedVideos);
+        setPdfResources(mappedPdfs);
+      } catch (err) {
+        console.error('Error fetching resources:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchResources();
+  }, []);
 
   // Scroll spy logic
   useEffect(() => {
@@ -92,6 +103,21 @@ const DataScienceStack = () => {
     setShowModal(true);
   };
 
+  const handleNavClick = (e, id) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      const offset = 100; // Offset from top
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   return (
     <div className="bg-neutral-50 min-h-screen w-full">
       {/* Container for timeline (left) + content (right) */}
@@ -103,7 +129,8 @@ const DataScienceStack = () => {
               <a
                 key={id}
                 href={`#${id}`}
-                className="group block relative pl-6"
+                onClick={(e) => handleNavClick(e, id)}
+                className="group block relative pl-6 cursor-pointer"
               >
                 {/* Vertical line */}
                 <span className="absolute left-2 top-0 bottom-0 border-l-2 border-gray-300" />
@@ -262,46 +289,175 @@ const DataScienceStack = () => {
             </ul>
           </div>
 
-          {/* PDF Resources */}
-          <div id="pdf">
-            <h2 className="text-3xl font-bold text-blue-950 mb-6">PDF Resources</h2>
-            <div className="grid md:grid-cols-2 gap-8">
-              {pdfResources.map((pdf, index) => (
-                <div key={pdf.id} className="bg-white border border-neutral-200 p-6 rounded-xl shadow-md">
-                  <img src={pdf.image} alt={pdf.title} className="rounded-lg h-48 w-full object-cover mb-4" />
-                  <h4 className="text-2xl font-semibold text-neutral-900 mb-2">{pdf.title}</h4>
-                  <p className="text-lg text-neutral-700 mb-4">{pdf.description}</p>
-                  <button
-                    onClick={() => handleOpenModal('pdfresource', index)}
-                    className="bg-blue-950 text-white px-6 py-3 rounded-lg text-lg hover:bg-blue-800 transition"
-                  >
-                    Study Now
-                  </button>
-                </div>
-              ))}
+          {/* Course Resources - Unified Section */}
+          <div id="pdf" className="mb-16">
+            <div className="mb-8">
+              <h2 className="text-4xl font-bold text-blue-950 mb-2">Course Resources</h2>
+              <p className="text-lg text-neutral-600">Access PDF guides and video tutorials to enhance your learning</p>
             </div>
+
+            {/* Tab Navigation */}
+            <div className="flex gap-4 mb-8 border-b-2 border-neutral-200">
+              <button
+                onClick={() => setActiveResourceTab('pdf')}
+                className={`flex items-center gap-3 px-6 py-4 font-semibold text-lg transition-all duration-300 relative ${
+                  activeResourceTab === 'pdf'
+                    ? 'text-blue-950'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                <FileText className={`w-5 h-5 ${activeResourceTab === 'pdf' ? 'text-blue-950' : 'text-neutral-400'}`} />
+                PDF Resources
+                {pdfResources.length > 0 && (
+                  <span className={`ml-2 px-2.5 py-0.5 rounded-full text-sm ${
+                    activeResourceTab === 'pdf' ? 'bg-blue-950 text-white' : 'bg-neutral-200 text-neutral-600'
+                  }`}>
+                    {pdfResources.length}
+                  </span>
+                )}
+                {activeResourceTab === 'pdf' && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-950"></span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveResourceTab('video')}
+                className={`flex items-center gap-3 px-6 py-4 font-semibold text-lg transition-all duration-300 relative ${
+                  activeResourceTab === 'video'
+                    ? 'text-blue-950'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                <Video className={`w-5 h-5 ${activeResourceTab === 'video' ? 'text-blue-950' : 'text-neutral-400'}`} />
+                Video Resources
+                {videoResources.length > 0 && (
+                  <span className={`ml-2 px-2.5 py-0.5 rounded-full text-sm ${
+                    activeResourceTab === 'video' ? 'bg-blue-950 text-white' : 'bg-neutral-200 text-neutral-600'
+                  }`}>
+                    {videoResources.length}
+                  </span>
+                )}
+                {activeResourceTab === 'video' && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-950"></span>
+                )}
+              </button>
+            </div>
+
+            {/* Resources Content */}
+            {loading ? (
+              <div className="text-center py-16">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-950 border-t-transparent"></div>
+                <p className="mt-4 text-lg text-neutral-600">Loading resources...</p>
+              </div>
+            ) : activeResourceTab === 'pdf' ? (
+              pdfResources.length === 0 ? (
+                <div className="text-center py-16 bg-gradient-to-br from-neutral-50 to-neutral-100 border-2 border-dashed border-neutral-300 rounded-2xl">
+                  <FileText className="w-16 h-16 text-neutral-400 mx-auto mb-4" />
+                  <p className="text-xl font-semibold text-neutral-700 mb-2">No PDF Resources Available</p>
+                  <p className="text-lg text-neutral-500">Check back soon for study materials!</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {pdfResources.map((pdf, index) => (
+                    <div
+                      key={pdf.id}
+                      className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-neutral-200 hover:border-blue-950/30"
+                    >
+                      {pdf.image && (
+                        <div className="relative overflow-hidden">
+                          <img
+                            src={pdf.image}
+                            alt={pdf.title}
+                            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute top-4 right-4 bg-blue-950/90 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+                            <FileText className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                      )}
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-3">
+                          <h4 className="text-xl font-bold text-neutral-900 group-hover:text-blue-950 transition-colors line-clamp-2 flex-1">
+                            {pdf.title}
+                          </h4>
+                        </div>
+                        <p className="text-neutral-600 mb-4 line-clamp-2 text-sm leading-relaxed">
+                          {pdf.description || 'Comprehensive study material to enhance your learning'}
+                        </p>
+                        <button
+                          onClick={() => handleOpenModal('pdfresource', index)}
+                          className="w-full flex items-center justify-center gap-2 bg-blue-950 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-all duration-300 group-hover:shadow-lg"
+                        >
+                          <BookOpen className="w-5 h-5" />
+                          Study Now
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              videoResources.length === 0 ? (
+                <div className="text-center py-16 bg-gradient-to-br from-neutral-50 to-neutral-100 border-2 border-dashed border-neutral-300 rounded-2xl">
+                  <Video className="w-16 h-16 text-neutral-400 mx-auto mb-4" />
+                  <p className="text-xl font-semibold text-neutral-700 mb-2">No Video Resources Available</p>
+                  <p className="text-lg text-neutral-500">Check back soon for video tutorials!</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {videoResources.map((video, index) => (
+                    <div
+                      key={video.id}
+                      className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-neutral-200 hover:border-blue-950/30"
+                    >
+                      {video.image && (
+                        <div className="relative overflow-hidden">
+                          <img
+                            src={video.image}
+                            alt={video.title}
+                            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                            <div className="bg-white/90 backdrop-blur-sm rounded-full p-4 group-hover:scale-110 transition-transform">
+                              <PlayCircle className="w-12 h-12 text-blue-950" />
+                            </div>
+                          </div>
+                          <div className="absolute top-4 right-4 bg-blue-950/90 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+                            <Video className="w-5 h-5 text-white" />
+                          </div>
+                          {video.duration && video.duration !== 'N/A' && (
+                            <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-white" />
+                              <span className="text-white text-sm font-medium">{video.duration}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-3">
+                          <h4 className="text-xl font-bold text-neutral-900 group-hover:text-blue-950 transition-colors line-clamp-2 flex-1">
+                            {video.title}
+                          </h4>
+                        </div>
+                        <p className="text-neutral-600 mb-4 line-clamp-2 text-sm leading-relaxed">
+                          {video.description || 'Comprehensive video tutorial to enhance your learning'}
+                        </p>
+                        <button
+                          onClick={() => handleOpenModal('video', index)}
+                          className="w-full flex items-center justify-center gap-2 bg-blue-950 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-all duration-300 group-hover:shadow-lg"
+                        >
+                          <PlayCircle className="w-5 h-5" />
+                          Watch Now
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
           </div>
 
-          {/* Video Resources */}
-          <div id="videos">
-            <h2 className="text-3xl font-bold text-blue-950 mb-6">Video Resources</h2>
-            <div className="grid md:grid-cols-2 gap-8">
-              {videoResources.map((video, index) => (
-                <div key={video.id} className="bg-white border border-neutral-200 p-6 rounded-xl shadow-md">
-                  <img src={video.image} alt={video.title} className="rounded-lg h-48 w-full object-cover mb-4" />
-                  <h4 className="text-2xl font-semibold text-neutral-900 mb-2">{video.title}</h4>
-                  <p className="text-lg text-neutral-700 mb-2">{video.description}</p>
-                  <p className="text-sm text-neutral-500 mb-4">Duration: {video.duration}</p>
-                  <button
-                    onClick={() => handleOpenModal('video', index)}
-                    className="bg-blue-950 text-white px-6 py-3 rounded-lg text-lg hover:bg-blue-800 transition"
-                  >
-                    Watch Now
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Video Resources anchor for navigation */}
+          <div id="videos" className="hidden"></div>
 
           {showModal && (
             <DataScienceVideoPdfModal type={modalType} index={selectedIndex} onClose={() => setShowModal(false)} />

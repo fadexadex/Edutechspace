@@ -19,10 +19,10 @@ const Navbar = () => {
   return (
     <>
       <header className="sticky top-0 z-50 backdrop-blur-md border border-white/10">
-        <nav className="px-10 py-7">
+        <nav className="px-6 md:px-10 py-3 md:py-4">
           <div className="relative flex items-center justify-between">
-            <NavLink to="/" className="relative z-10 pr-4 xl:pr-0">
-              <img className="h-10" src={logoiii} alt="RUNTechSpace Logo" />
+              <NavLink to="/" className="relative z-10 pr-4 xl:pr-0">
+              <img className="h-8 md:h-10" src={logoiii} alt="RUNTechSpace Logo" />
             </NavLink>
             <div className="hidden xl:flex xl:justify-center gap-16 xl:absolute xl:w-full xl:top-1/2 xl:left-1/2 xl:-translate-y-1/2 xl:-translate-x-1/2">
               <NavLink className="navlinks" to="/">
@@ -149,6 +149,8 @@ const Navbar = () => {
                 </NavLink>
                 {isAuthenticated && (
                   <>
+                    {/* Notifications route not implemented yet - commenting out to prevent 404 */}
+                    {/* 
                     <NavLink
                       className="max-w-max navlinks"
                       to="/notifications"
@@ -156,6 +158,7 @@ const Navbar = () => {
                     >
                       Notifications
                     </NavLink>
+                    */}
                     <button
                       type="button"
                       className="max-w-max navlinks text-left cursor-pointer"

@@ -9,7 +9,7 @@ const MainLayout = () => {
   return (
     <div className="min-h-screen bg-neutral-100">
       <Navbar />
-      <main>
+      <main className="bg-neutral-100">
         <ToastContainer
           position="top-right"
           autoClose={3000}

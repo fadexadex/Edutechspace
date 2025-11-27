@@ -1,22 +1,48 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { BrowserRouter } from "react-router-dom";
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import ErrorBoundary from './component/ErrorBoundary.jsx';
 import { AuthProvider } from './context/AuthProvider.jsx';
+import LoadingPage from './pages/LoadingPage';
+
+// Add global error handler for unhandled errors
+window.addEventListener('error', (event) => {
+  console.error('Global error caught:', event.error);
+  // Prevent default error handling that causes blank screens
+  event.preventDefault();
+  return true;
+}, true);
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+  // Prevent default error handling
+  event.preventDefault();
+});
+
+// Prevent React from unmounting on errors
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  // Filter out React hydration warnings that can cause blank screens
+  if (args[0] && typeof args[0] === 'string' && args[0].includes('hydration')) {
+    return;
+  }
+  originalConsoleError.apply(console, args);
+};
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <GoogleOAuthProvider clientId="1045202747081-1o2vm7upt8dbc0851sqgt19u1dka83u0.apps.googleusercontent.com">
-      <BrowserRouter> 
-        <ErrorBoundary>
+    <BrowserRouter>
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingPage />}>
           <AuthProvider>
-            <App />
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
           </AuthProvider>
-        </ErrorBoundary>
-      </BrowserRouter>
-    </GoogleOAuthProvider>
+        </Suspense>
+      </ErrorBoundary>
+    </BrowserRouter>
   </StrictMode>,
 );

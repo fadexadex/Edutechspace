@@ -43,6 +43,8 @@ const Login = () => {
     <section className="flex flex-col items-center justify-start pt-20 pb-6 min-h-screen bg-neutral-100 px-6">
       <div className="bg-white shadow-lg rounded-lg p-8 max-w-md w-full">
         <h2 className="text-2xl font-bold text-neutral-900 mb-4 text-center">Welcome Back!</h2>
+        {/* Google OAuth temporarily disabled - uncomment below to enable */}
+        {/* 
         <div className="mb-4">
           <button
             onClick={() => googleLogin()}
@@ -66,6 +68,7 @@ const Login = () => {
             <span className="bg-white px-2 text-neutral-600">or</span>
           </div>
         </div>
+        */}
         <form onSubmit={handleEmailLogin} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-neutral-700 font-bold">

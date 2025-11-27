@@ -37,6 +37,8 @@ const Signup = () => {
     <section className="flex flex-col items-center justify-center min-h-screen bg-neutral-100 p-6">
       <div className="bg-white shadow-lg rounded-lg p-8 max-w-md w-full">
         <h2 className="text-2xl font-bold text-neutral-900 mb-4 text-center">Create an Account</h2>
+        {/* Google OAuth temporarily disabled - uncomment below to enable */}
+        {/* 
         <div className="mb-4">
           <button
             onClick={() => googleLogin()}
@@ -60,6 +62,7 @@ const Signup = () => {
             <span className="bg-white px-2 text-neutral-600">or</span>
           </div>
         </div>
+        */}
         <form onSubmit={handleEmailSignup} className="space-y-4">
           <div>
             <label htmlFor="name" className="block text-neutral-700">
