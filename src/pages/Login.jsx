@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthProvider';
 import { AiOutlineEye, AiOutlineEyeInvisible } from 'react-icons/ai';
 import ForgotPasswordMdl from '../component/dialog/ForgotPasswordMdl';
 const Login = () => {
-  const { login, googleLogin, loading, isAuthenticated } = useContext(AuthContext);
+  const { login, googleLogin, loading, isAuthenticated, isOnline } = useContext(AuthContext);
   const navigate = useNavigate();
 
   // Redirect authenticated users to /course
@@ -22,8 +22,12 @@ const Login = () => {
     e.preventDefault();
     try {
       await login(email, password);
+      // After successful login, navigate to /course
+      // The useEffect will also try to redirect, but this ensures immediate navigation
+      navigate('/course', { replace: true });
     } catch (err) {
       // Errors are handled in AuthProvider with toast
+      // Don't navigate on error
     }
   };
 
@@ -42,6 +46,11 @@ const Login = () => {
   return (
     <section className="flex flex-col items-center justify-start pt-20 pb-6 min-h-screen bg-neutral-100 px-6">
       <div className="bg-white shadow-lg rounded-lg p-8 max-w-md w-full">
+        {!isOnline && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+            <strong>No Internet Connection</strong> - Please check your network and try again.
+          </div>
+        )}
         <h2 className="text-2xl font-bold text-neutral-900 mb-4 text-center">Welcome Back!</h2>
         {/* Google OAuth temporarily disabled - uncomment below to enable */}
         {/* 
@@ -108,10 +117,10 @@ const Login = () => {
           </div>
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-blue-950 text-white p-3 rounded-lg hover:bg-slate-900 transition"
+            disabled={loading || !isOnline}
+            className="w-full bg-blue-950 text-white p-3 rounded-lg hover:bg-slate-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? 'Logging in...' : !isOnline ? 'No Connection' : 'Login'}
           </button>
         </form>
         <div className="text-center mt-4">

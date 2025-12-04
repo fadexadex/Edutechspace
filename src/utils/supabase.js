@@ -11,11 +11,34 @@ if (!supabaseUrl || !supabaseKey) {
   console.error("VITE_SUPABASE_ANON_KEY=your_supabase_anon_key");
 }
 
-// Create client with fallback empty strings if env vars are missing
-// This prevents the app from crashing, but API calls will fail
+// Create client with improved configuration for better reliability
 export const supabase = createClient(
   supabaseUrl || "https://placeholder.supabase.co",
-  supabaseKey || "placeholder-key"
+  supabaseKey || "placeholder-key",
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      storageKey: 'edutechspace-auth',
+      storage: window.localStorage,
+      flowType: 'pkce' // More secure auth flow
+    },
+    global: {
+      headers: {
+        'x-application-name': 'edutechspace'
+      }
+    },
+    db: {
+      schema: 'public'
+    },
+    // Add retry logic for failed requests
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
+    }
+  }
 );
 
 // Export a flag to check if Supabase is properly configured

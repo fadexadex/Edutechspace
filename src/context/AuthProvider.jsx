@@ -8,6 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const isSyncingUser = useRef(false);
   const isInitialized = useRef(false);
 
@@ -17,6 +18,29 @@ export const AuthProvider = ({ children }) => {
     if (window.location.pathname !== '/login' && window.location.pathname !== '/admin/login') {
       window.location.href = '/login';
     }
+  }, []);
+
+  // Monitor network status
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('Network: Back online');
+      setIsOnline(true);
+      toast.info('Connection restored');
+    };
+    
+    const handleOffline = () => {
+      console.log('Network: Offline');
+      setIsOnline(false);
+      toast.warning('No internet connection');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   useEffect(() => {
@@ -66,6 +90,8 @@ export const AuthProvider = ({ children }) => {
 
     // Listen for Supabase auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event);
+      
       // Prevent navigation loops
       if (event === 'SIGNED_IN' && session) {
         if (!isSyncingUser.current) {
@@ -81,9 +107,23 @@ export const AuthProvider = ({ children }) => {
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsAuthenticated(false);
+        setLoading(false);
         // Only navigate if not already on login page
         if (window.location.pathname !== '/login' && window.location.pathname !== '/admin/login') {
           navigateToLogin();
+        }
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('Token refreshed successfully');
+      } else if (event === 'USER_UPDATED') {
+        if (session?.user && !isSyncingUser.current) {
+          isSyncingUser.current = true;
+          try {
+            await syncUser(session.user);
+          } catch (err) {
+            console.error('Sync user error on update:', err);
+          } finally {
+            isSyncingUser.current = false;
+          }
         }
       }
     });
@@ -95,8 +135,15 @@ export const AuthProvider = ({ children }) => {
     };
   }, [navigateToLogin]);
 
-  const syncUser = async (supabaseUser) => {
+  const syncUser = async (supabaseUser, retryCount = 0) => {
+    const maxRetries = 2;
+    
     try {
+      // Check network connectivity first
+      if (!navigator.onLine) {
+        throw new Error('No internet connection');
+      }
+
       // Check if user exists in our users table
       const { data: existingUser, error: selectError } = await supabase
         .from('users')
@@ -182,17 +229,32 @@ export const AuthProvider = ({ children }) => {
       
     } catch (err) {
       console.error('❌ Sync user error:', err);
-      // Don't show toast on every error - might be RLS or network issues
-      // Only show for critical errors
-      if (err.message && !err.message.includes('row-level security')) {
-        toast.error('Failed to sync user account.');
+      
+      // Retry logic for network errors
+      if (retryCount < maxRetries && (err.message?.includes('Failed to fetch') || err.message?.includes('network') || !navigator.onLine)) {
+        console.log(`Retrying sync (${retryCount + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+        return syncUser(supabaseUser, retryCount + 1);
       }
+      
+      // Show user-friendly error messages
+      if (!navigator.onLine || err.message?.includes('No internet connection')) {
+        toast.error('No internet connection. Please check your network.');
+      } else if (err.message && !err.message.includes('row-level security')) {
+        toast.error('Failed to sync user account. Please refresh the page.');
+      }
+      
       setLoading(false);
+      // For critical errors, sign out the user
+      if (err.message?.includes('JWT') || err.message?.includes('token')) {
+        await supabase.auth.signOut();
+      }
       // Don't throw - allow app to continue
     }
   };
 
   const login = async (email, password) => {
+    setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -203,12 +265,31 @@ export const AuthProvider = ({ children }) => {
         throw error;
       }
 
-      // syncUser will be called by onAuthStateChange listener
-      // Don't set loading here - let the auth state change handle it
+      // Wait for user sync with timeout
+      if (data.session && data.user) {
+        try {
+          // Sync user data immediately for faster login
+          await syncUser(data.user);
+          toast.success('Logged in successfully!');
+          // Navigation will be handled by Login component
+        } catch (syncErr) {
+          console.error('Initial sync failed, will retry:', syncErr);
+          // Don't fail login if sync fails - auth state listener will retry
+        }
+      }
       
     } catch (err) {
-      const errorMsg = err.message || 'Failed to log in';
-      toast.error(errorMsg);
+      setLoading(false);
+      // Check if it's a network error
+      if (!navigator.onLine) {
+        toast.error('No internet connection. Please check your network and try again.');
+      } else if (err.message?.includes('Invalid login credentials')) {
+        toast.error('Invalid email or password.');
+      } else if (err.message?.includes('Email not confirmed')) {
+        toast.error('Please confirm your email before logging in.');
+      } else {
+        toast.error(err.message || 'Failed to log in. Please try again.');
+      }
       throw err;
     }
   };
@@ -417,6 +498,7 @@ export const AuthProvider = ({ children }) => {
     user,
     isAuthenticated,
     loading,
+    isOnline,
     signup,
     login,
     logout,

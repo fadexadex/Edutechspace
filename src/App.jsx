@@ -22,6 +22,7 @@ import UiUxStack from './stacks/UiUxStack';
 import MLStack from './stacks/MLStack';
 import AiStack from './stacks/AiStack';
 import UserDashboard from './pages/Dashboard';
+import LessonView from './pages/LessonView';
 import ProtectedRoute from './component/ProtectedRoute';
 import AdminLayout from './admin/AdminLayout';
 import AdminLogin from './admin/pages/AdminLogin';
@@ -32,6 +33,8 @@ import AdminCourseForm from './admin/pages/AdminCourseForm';
 import AdminResources from './admin/pages/AdminResources';
 import AdminExams from './admin/pages/AdminExams';
 import AdminUsers from './admin/pages/AdminUsers';
+import ModuleManager from './admin/pages/ModuleManager';
+import LessonManager from './admin/pages/LessonManager';
 import { isSupabaseConfigured } from './utils/supabase';
 
 const App = () => {
@@ -82,6 +85,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
         {/* Protected Routes (require authentication) */}
         <Route element={<ProtectedRoute />}>
           <Route path="course" element={<Course />} />
+          <Route path="course/:courseId/lesson/:lessonId" element={<LessonView />} />
           <Route path="profile" element={<Profile />} />
           <Route path="dashboard" element={<UserDashboard />} />
           <Route path="course/cybersecuritycourse" element={<CyberSecurityStack />} />
@@ -105,6 +109,8 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
         <Route path="courses" element={<AdminCourses />} />
         <Route path="courses/create" element={<AdminCourseForm />} />
         <Route path="courses/edit/:id" element={<AdminCourseForm />} />
+        <Route path="courses/:courseId/modules" element={<ModuleManager />} />
+        <Route path="modules/:moduleId/lessons" element={<LessonManager />} />
         <Route path="resources" element={<AdminResources />} />
         <Route path="resources/upload" element={<ResourceUpload />} />
         <Route path="resources/edit/:id" element={<ResourceUpload />} />

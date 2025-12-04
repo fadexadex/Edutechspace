@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { toast } from 'react-toastify';
-import { PlusIcon, PencilIcon, TrashIcon, BookOpenIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, BookOpenIcon, MagnifyingGlassIcon, RectangleStackIcon } from '@heroicons/react/24/outline';
 
 const AdminCourses = () => {
   const [courses, setCourses] = useState([]);
@@ -152,6 +152,15 @@ const AdminCourses = () => {
                 <p className="text-xs text-gray-600 mb-3 line-clamp-2">
                   {course.description || 'No description available'}
                 </p>
+
+                {/* Manage Modules Button */}
+                <Link
+                  to={`/admin/courses/${course.id}/modules`}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 mb-3 bg-green-50 text-green-700 text-sm font-medium rounded-md hover:bg-green-100 transition-colors"
+                >
+                  <RectangleStackIcon className="h-4 w-4" />
+                  Manage Modules
+                </Link>
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <span className="text-xs text-gray-500">

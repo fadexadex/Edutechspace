@@ -3,7 +3,7 @@ import React, { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthProvider";
 
 const ProtectedRoute = ({ requireAdmin = false }) => {
-  const { user, isAdmin, loading } = useContext(AuthContext);
+  const { user, isAdmin, loading, isAuthenticated } = useContext(AuthContext);
   const location = useLocation();
   const [isChecking, setIsChecking] = useState(true);
 
@@ -12,7 +12,7 @@ const ProtectedRoute = ({ requireAdmin = false }) => {
     // If loading takes too long, proceed anyway (prevents blank screens)
     const timeout = setTimeout(() => {
       setIsChecking(false);
-    }, 2000);
+    }, 3000); // Increased timeout for slower connections
 
     if (!loading) {
       setIsChecking(false);
@@ -35,7 +35,7 @@ const ProtectedRoute = ({ requireAdmin = false }) => {
   }
 
   // If no user after loading, redirect to login
-  if (!loading && !user) {
+  if (!isChecking && !loading && !isAuthenticated && !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

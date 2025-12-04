@@ -1,9 +1,12 @@
 // FrontendCourse.jsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { UserIcon, StarIcon, CheckIcon } from '@heroicons/react/24/solid';
 import { InfinityIcon, BarChart3, FileText, Video, Clock, BookOpen, PlayCircle } from 'lucide-react';
 import { supabase } from '../utils/supabase';
+import { useModules } from '../utils/useModules';
+import { useMultipleLessonCompletions } from '../utils/useLessonCompletion';
+import ModuleAccordion from '../component/modules/ModuleAccordion';
 import frontendHeaderImg from '../assets/images/frontendHeaderImage2.jpg';
 import htmlImg from '../assets/images/html-image.jpg';
 import cssImg from '../assets/images/css-image.jpg';
@@ -18,11 +21,14 @@ const sections = [
   { id: 'benefits', title: '🚀 Key Benefits' },
   { id: 'learn', title: '🧠 What You Will Learn' },
   { id: 'requirements', title: '🧰 What You Will Need' },
-  { id: 'pdf', title: '📚 Course Resources' },
+  { id: 'modules', title: '📚 Course Modules' },
+  { id: 'pdf', title: '📂 Additional Resources' },
   { id: 'recommendation', title: 'Course Recommendation' },
 ];
 
 const FrontendCourse = () => {
+  const navigate = useNavigate();
+  const courseId = 'frontend-dev'; // Course ID for module fetching
   const [activeSection, setActiveSection] = useState(null);
   const [modalType, setModalType] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -31,6 +37,17 @@ const FrontendCourse = () => {
   const [pdfResources, setPdfResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeResourceTab, setActiveResourceTab] = useState('pdf'); // 'pdf' or 'video'
+
+  // Fetch modules and lessons
+  const { modules, loading: modulesLoading } = useModules(courseId);
+  
+  // Get all lesson IDs for completion tracking
+  const allLessonIds = modules.flatMap(m => (m.lessons || []).map(l => l.id));
+  const { completions } = useMultipleLessonCompletions(allLessonIds);
+
+  const handleLessonClick = (lesson) => {
+    navigate(`/course/${courseId}/lesson/${lesson.id}`);
+  };
 
   // Fetch resources from Supabase
   useEffect(() => {
@@ -295,11 +312,45 @@ const FrontendCourse = () => {
             </ul>
           </div>
 
-          {/* Course Resources - Unified Section */}
+          {/* Course Modules Section */}
+          <div id="modules" className="mb-16">
+            <div className="mb-8">
+              <h2 className="text-4xl font-bold text-blue-950 mb-2">Course Modules</h2>
+              <p className="text-lg text-neutral-600">
+                Explore our structured learning modules. Click on any module to expand and view lessons.
+              </p>
+            </div>
+
+            {modulesLoading ? (
+              <div className="text-center py-16">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-950 border-t-transparent"></div>
+                <p className="mt-4 text-lg text-neutral-600">Loading modules...</p>
+              </div>
+            ) : modules.length === 0 ? (
+              <div className="text-center py-16 bg-gradient-to-br from-neutral-50 to-neutral-100 border-2 border-dashed border-neutral-300 rounded-2xl">
+                <BookOpen className="w-16 h-16 text-neutral-400 mx-auto mb-4" />
+                <p className="text-xl font-semibold text-neutral-700 mb-2">No Modules Available Yet</p>
+                <p className="text-lg text-neutral-500">Course content is being prepared. Check back soon!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {modules.map((module) => (
+                  <ModuleAccordion
+                    key={module.id}
+                    module={module}
+                    onLessonClick={handleLessonClick}
+                    completions={completions}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Course Resources - Unified Section (Legacy - now labeled as Additional Resources) */}
           <div id="pdf" className="mb-16">
             <div className="mb-8">
-              <h2 className="text-4xl font-bold text-blue-950 mb-2">Course Resources</h2>
-              <p className="text-lg text-neutral-600">Access PDF guides and video tutorials to enhance your learning</p>
+              <h2 className="text-4xl font-bold text-blue-950 mb-2">Additional Resources</h2>
+              <p className="text-lg text-neutral-600">Legacy PDF guides and video tutorials (now organized in modules above)</p>
             </div>
 
             {/* Tab Navigation */}

@@ -1,9 +1,12 @@
 // BackendCourse.jsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { UserIcon, StarIcon, CheckIcon } from '@heroicons/react/24/solid';
 import { InfinityIcon, BarChart3, FileText, Video, Clock, BookOpen, PlayCircle } from 'lucide-react';
 import { supabase } from '../utils/supabase';
+import { useModules } from '../utils/useModules';
+import { useMultipleLessonCompletions } from '../utils/useLessonCompletion';
+import ModuleAccordion from '../component/modules/ModuleAccordion';
 import backendHeaderImg from '../assets/images/backendImage (1).jpg';
 import videoimg1 from '../assets/images/backendImage (3).jpg';
 import videoimg2 from '../assets/images/backendImage (2).jpg';
@@ -18,11 +21,14 @@ const sections = [
   { id: 'benefits', title: '🚀 Key Benefits' },
   { id: 'learn', title: '🎓 What You Will Learn' },
   { id: 'requirements', title: '🧰 What You Will Need' },
-  { id: 'pdf', title: '📚 Course Resources' },
+  { id: 'modules', title: '📚 Course Modules' },
+  { id: 'pdf', title: '📂 Additional Resources' },
   { id: 'recommendation', title: 'Course Recommendation' },
 ];
 
 const BackendCourse = () => {
+  const navigate = useNavigate();
+  const courseId = 'backend-dev';
   const [activeSection, setActiveSection] = useState(null);
   const [modalType, setModalType] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -31,6 +37,17 @@ const BackendCourse = () => {
   const [pdfResources, setPdfResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeResourceTab, setActiveResourceTab] = useState('pdf'); // 'pdf' or 'video'
+
+  // Fetch modules and lessons
+  const { modules, loading: modulesLoading } = useModules(courseId);
+  
+  // Get all lesson IDs for completion tracking
+  const allLessonIds = modules.flatMap(m => (m.lessons || []).map(l => l.id));
+  const { completions } = useMultipleLessonCompletions(allLessonIds);
+
+  const handleLessonClick = (lesson) => {
+    navigate(`/course/${courseId}/lesson/${lesson.id}`);
+  };
 
   // Fetch resources from Supabase
   useEffect(() => {
@@ -296,6 +313,41 @@ const BackendCourse = () => {
               <li>Code editor (like VS Code)</li>
               <li>A desire to learn and build cool stuff</li>
             </ul>
+          </div>
+
+          {/* Course Modules Section */}
+          <div id="modules" className="mb-16">
+            <div className="mb-8">
+              <h2 className="text-4xl font-bold text-blue-950 mb-2">Course Modules</h2>
+              <p className="text-lg text-neutral-600">
+                Structured learning path with interactive lessons and hands-on projects
+              </p>
+            </div>
+
+            {modulesLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            ) : modules.length > 0 ? (
+              <div className="space-y-4">
+                {modules.map((module, index) => (
+                  <ModuleAccordion
+                    key={module.id}
+                    module={module}
+                    moduleNumber={index + 1}
+                    completedLessonIds={completions}
+                    onLessonClick={handleLessonClick}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="bg-neutral-50 rounded-xl p-8 text-center">
+                <BookOpen className="w-16 h-16 text-neutral-400 mx-auto mb-4" />
+                <p className="text-neutral-600 text-lg">
+                  Course modules are being prepared. Check back soon!
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Course Resources - Unified Section */}
